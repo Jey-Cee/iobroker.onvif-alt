@@ -1,0 +1,147 @@
+<html>
+
+<head>
+
+    <!-- Load ioBroker scripts and styles-->
+    <link rel="stylesheet" type="text/css" href="../../css/adapter.css" />
+    <link rel="stylesheet" type="text/css" href="../../lib/css/materialize.css">
+
+    <script type="text/javascript" src="../../lib/js/jquery-3.2.1.min.js"></script>
+    <script type="text/javascript" src="../../socket.io/socket.io.js"></script>
+
+    <script type="text/javascript" src="../../js/translate.js"></script>
+    <script type="text/javascript" src="../../lib/js/materialize.js"></script>
+    <script type="text/javascript" src="../../js/adapter-settings.js"></script>
+
+    <!-- Load our own files -->
+    <link rel="stylesheet" type="text/css" href="style.css" />
+    <script type="text/javascript" src="words.js"></script>
+
+    <script type="text/javascript">
+        // This will be called by the admin adapter when the settings page loads
+
+        function showDevice(obj, isFirst) {
+            var text = '';
+            if(obj.common.role != 'gateway' && obj.common.role != 'group') {
+                text += '<td>' + obj.common.name + '</td>';
+                text += '<td>' + obj.native.user + '</td>';
+                text += '<td> <div class="input-field col s12"> <input id="password" type="password" class="validate">' + obj.native.password + '<label for="password">Password</label></div></td>';
+                $('#devices').append(text);
+                /*$('#' + obj.native.id + obj.common.role).change({id : obj.native.id}, onSelect);
+            $('#' + obj.native.id + obj.common.role).select();*/
+                $('#' + obj.native.id + obj.common.role).click(function(){
+                    if(obj.common.role === 'sensor') {
+                        sendTo('deconz.' + instance, 'deleteSensor', obj.native.id);
+                        //$('#user.value').val('').trigger('change');
+                    }else if(obj.common.role === 'light'){
+                        sendTo('deconz.' + instance, 'deleteLight', obj.native.id);
+                    }
+                    $("#devices > tr").remove();
+                    // populate the list of known devices
+                    setTimeout(function(){
+                        socket.emit('getObjectView', 'system', 'device', { startkey: 'deconz.' + instance + '.', endkey: 'deconz.' + instance + '.\u9999', include_docs: true }, function (err, _devices) {
+                            socket.emit('getStates', function (err, _values) {
+                                var namespace = 'deconz.' + instance + '.';
+                                var len = namespace.length;
+                                if (_devices && _devices.rows && _devices.rows.length) {
+                                    for (var j = 0; j < _devices.rows.length; j++) {
+                                        devices[_devices.rows[j].value._id] = _devices.rows[j].value;
+                                        showDevice(_devices.rows[j].value, true);
+                                    }
+                                }
+                            });
+                        });
+                    }, 1000);
+                });
+            }
+        }
+
+        function emitDevices(){
+            socket.emit('getObjectView', 'system', 'device', { startkey: 'onvif.' + instance + '.', endkey: 'onvif.' + instance + '.\u9999', include_docs: true }, function (err, _devices) {
+                socket.emit('getStates', function (err, _values) {
+                    var namespace = 'onvif.' + instance + '.';
+                    var len = namespace.length;
+                    if (_devices && _devices.rows && _devices.rows.length) {
+                        for (var j = 0; j < _devices.rows.length; j++) {
+                            devices[_devices.rows[j].value._id] = _devices.rows[j].value;
+                            showDevice(_devices.rows[j].value, true);
+                        }
+                    }
+                });
+            });
+        }
+
+        function load(settings, onChange) {
+            // example: select elements with id=key and class=value and insert value
+            if (!settings) return;
+            $('.value').each(function () {
+                var $key = $(this);
+                var id = $key.attr('id');
+                if ($key.attr('type') === 'checkbox') {
+                    // do not call onChange direct, because onChange could expect some arguments
+                    $key.prop('checked', settings[id])
+                        .on('change', () => onChange())
+                        ;
+                } else {
+                    // do not call onChange direct, because onChange could expect some arguments
+                    $key.val(settings[id])
+                        .on('change', () => onChange())
+                        .on('keyup', () => onChange())
+                        ;
+                }
+            });
+            onChange(false);
+            // reinitialize all the Materialize labels on the page if you are dynamically adding inputs:
+            if (M) M.updateTextFields();
+        }
+
+        // This will be called by the admin adapter when the user presses the save button
+        function save(callback) {
+            // example: select elements with class=value and build settings object
+            var obj = {};
+            $('.value').each(function () {
+                var $this = $(this);
+                if ($this.attr('type') === 'checkbox') {
+                    obj[$this.attr('id')] = $this.prop('checked');
+                } else {
+                    obj[$this.attr('id')] = $this.val();
+                }
+            });
+            callback(obj);
+        }
+    </script>
+
+</head>
+
+<body>
+
+    <div class="m adapter-container">
+
+        <div class="row">
+            <div class="col s12 m4 l2">
+                <img src="template.png" class="logo">
+            </div>
+        </div>
+
+        <!-- List of devices -->
+
+        <div class="table-values-div">
+            <table class="table-values centered">
+                <thead>
+                <tr>
+                    <th class="translate" data-lang="Name">Name</th>
+                    <th class="translate" data-lang="User">User</th>
+                    <th class="translate" data-lang="Password">Password</th>
+                    <th class="translate"></th>
+                </tr>
+                </thead>
+                <tbody id="groups"></tbody>
+            </table>
+        </div>
+
+
+    </div>
+
+</body>
+
+</html>

@@ -1,0 +1,90 @@
+{
+    "common": {
+        "name": "onvif",
+        "version": "0.0.1",
+        "news": {
+            "0.0.1": {
+                "en": "initial version created with Adapter-Studio by Jey Cee",
+                "de": "erste Version erstellt mit Adapter-Studio von Jey Cee",
+                "ru": "начальная версия, созданная с помощью Adapter-Studio by Jey Cee",
+                "pt": "versão inicial criada com o Adapter-Studio por Jey Cee",
+                "nl": "eerste versie gemaakt met Adapter-Studio door Jey Cee",
+                "fr": "Version initiale créée avec Adapter-Studio par Jey Cee",
+                "it": "versione iniziale creata con Adapter-Studio di Jey Cee",
+                "es": "versión inicial creada con Adapter-Studio por Jey Cee",
+                "pl": "początkowa wersja stworzona za pomocą Adapter-Studio przez Jey Cee"
+            }
+        },
+        "title": "Onvif",
+        "titleLang": {
+            "en": "Onvif",
+            "de": "Onvif",
+            "ru": "Onvif",
+            "pt": "Onvif",
+            "nl": "Onvif",
+            "fr": "Onvif",
+            "it": "Onvif",
+            "es": "Onvif",
+            "pl": "Onvif",
+            "zh-cn": "Onvif"
+        },
+        "desc": {
+            "en": "Discover and control onvif ready cameras.\n",
+            "de": "Entdecken und steuern Sie onvif-fähige Kameras.\n",
+            "ru": "Обнаружение и контроль готовых камер.\n",
+            "pt": "Descubra e controle câmeras prontas onvif.\n",
+            "nl": "Ontdek en bestuur onvif-ready camera's.\n",
+            "fr": "Découvrez et contrôlez les caméras prêtes pour Onvif.\n",
+            "it": "Scopri e controlla le fotocamere onvif ready.\n",
+            "es": "Descubrir y controlar las cámaras onvif ready.\n",
+            "pl": "Odkryj i steruj kamerami onvif.\n",
+            "zh-cn": "发现并控制onvif ready相机。\n"
+        },
+        "authors": [
+            "Jey Cee <jey-cee@live.com>"
+        ],
+        "keywords": [
+            "onvif",
+            "camera",
+            "iobroker",
+            "security,"
+        ],
+        "license": "MIT",
+        "platform": "Javascript/Node.js",
+        "main": "main.js",
+        "icon": "onvif.png",
+        "enabled": false,
+        "extIcon": "https://raw.githubusercontent.com/Jey-Cee/ioBroker.onvif/master/admin/onvif.png",
+        "readme": "https://github.com/Jey-Cee/ioBroker.onvif/blob/master/README.md",
+        "loglevel": "info",
+        "mode": "daemon",
+        "type": "hardware",
+        "compact": true,
+        "materialize": true,
+        "supportCustoms": false,
+        "dependencies": [
+            {
+                "js-controller": ">=1.4.2"
+            }
+        ],
+        "messagebox": true
+    },
+    "native": {
+        "ffmpeg_installed": false
+    },
+    "objects": [],
+    "instanceObjects": [
+        {
+            "_id": "discover",
+            "type": "state",
+            "common": {
+                "role": "button",
+                "name": "Discover new cameras",
+                "type": "boolean",
+                "read": false,
+                "write": true
+            },
+            "native": {}
+        }
+    ]
+}
