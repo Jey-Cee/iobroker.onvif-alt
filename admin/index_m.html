@@ -19,52 +19,35 @@
 
     <script type="text/javascript">
         // This will be called by the admin adapter when the settings page loads
+        let onChangeG;
+        function showDevice(obj) {
 
-        function showDevice(obj, isFirst) {
-            var text = '';
-            if(obj.common.role != 'gateway' && obj.common.role != 'group') {
-                text += '<td>' + obj.common.name + '</td>';
-                text += '<td>' + obj.native.user + '</td>';
-                text += '<td> <div class="input-field col s12"> <input id="password" type="password" class="validate">' + obj.native.password + '<label for="password">Password</label></div></td>';
+            let text = '';
+                text += '<tr id="' + obj._id+ '"><td><input class="center" type="text" value="' + obj.common.name+ '">';
+                text += '<td> <input class="center" type="text" value="' + obj.native.user+ '">';
+                text += '<td> <input class="center" type="password" class="validate" value="' + obj.native.password + '">';
+                text += '<td> <input class="center" type="text" value="' + obj.native.ip+ '">';
+                text += '<td> <input class="center" type="number" value="' + obj.native.port+ '">';
                 $('#devices').append(text);
-                /*$('#' + obj.native.id + obj.common.role).change({id : obj.native.id}, onSelect);
-            $('#' + obj.native.id + obj.common.role).select();*/
-                $('#' + obj.native.id + obj.common.role).click(function(){
-                    if(obj.common.role === 'sensor') {
-                        sendTo('deconz.' + instance, 'deleteSensor', obj.native.id);
-                        //$('#user.value').val('').trigger('change');
-                    }else if(obj.common.role === 'light'){
-                        sendTo('deconz.' + instance, 'deleteLight', obj.native.id);
-                    }
-                    $("#devices > tr").remove();
-                    // populate the list of known devices
-                    setTimeout(function(){
-                        socket.emit('getObjectView', 'system', 'device', { startkey: 'deconz.' + instance + '.', endkey: 'deconz.' + instance + '.\u9999', include_docs: true }, function (err, _devices) {
-                            socket.emit('getStates', function (err, _values) {
-                                var namespace = 'deconz.' + instance + '.';
-                                var len = namespace.length;
-                                if (_devices && _devices.rows && _devices.rows.length) {
-                                    for (var j = 0; j < _devices.rows.length; j++) {
-                                        devices[_devices.rows[j].value._id] = _devices.rows[j].value;
-                                        showDevice(_devices.rows[j].value, true);
-                                    }
-                                }
-                            });
-                        });
-                    }, 1000);
-                });
-            }
+
+            M.updateTextFields();
+
+            //$('#devices > tr').eq(countRows).find('td').eq(0).find('input').val(name)
+            $('input')
+                .on('change', () => onChangeG())
+                .on('keyup', () => onChangeG());
         }
 
         function emitDevices(){
             socket.emit('getObjectView', 'system', 'device', { startkey: 'onvif.' + instance + '.', endkey: 'onvif.' + instance + '.\u9999', include_docs: true }, function (err, _devices) {
                 socket.emit('getStates', function (err, _values) {
-                    var namespace = 'onvif.' + instance + '.';
-                    var len = namespace.length;
+                    let namespace = 'onvif.' + instance + '.';
+                    let len = namespace.length;
                     if (_devices && _devices.rows && _devices.rows.length) {
-                        for (var j = 0; j < _devices.rows.length; j++) {
-                            devices[_devices.rows[j].value._id] = _devices.rows[j].value;
-                            showDevice(_devices.rows[j].value, true);
+                        for (let j = 0; j < _devices.rows.length; j++) {
+                            _devices[_devices.rows[j].value._id] = _devices.rows[j].value;
+                            //console.log(_devices.rows[j].value);
+                            showDevice(_devices.rows[j].value);
                         }
                     }
                 });
@@ -72,11 +55,12 @@
         }
 
         function load(settings, onChange) {
+            onChangeG = onChange;
             // example: select elements with id=key and class=value and insert value
             if (!settings) return;
             $('.value').each(function () {
-                var $key = $(this);
-                var id = $key.attr('id');
+                let $key = $(this);
+                let id = $key.attr('id');
                 if ($key.attr('type') === 'checkbox') {
                     // do not call onChange direct, because onChange could expect some arguments
                     $key.prop('checked', settings[id])
@@ -90,17 +74,18 @@
                         ;
                 }
             });
+            emitDevices();
             onChange(false);
             // reinitialize all the Materialize labels on the page if you are dynamically adding inputs:
-            if (M) M.updateTextFields();
+            M.updateTextFields();
         }
 
         // This will be called by the admin adapter when the user presses the save button
         function save(callback) {
             // example: select elements with class=value and build settings object
-            var obj = {};
+            let obj = {};
             $('.value').each(function () {
-                var $this = $(this);
+                let $this = $(this);
                 if ($this.attr('type') === 'checkbox') {
                     obj[$this.attr('id')] = $this.prop('checked');
                 } else {
@@ -108,6 +93,35 @@
                 }
             });
             callback(obj);
+
+            let updateList ={};
+            $('#devices > tr').each((i, e)=>{
+                let id = $(e).attr('id');
+                updateList[id] =  {};
+                $(e).children().each((i2, e2)=>{
+                    let value = $(e2).children('input').val();
+                    switch(i2){
+                        case 0:
+                            updateList[id].name = value;
+                            break;
+                        case 1:
+                            updateList[id].user = value;
+                            break;
+                        case 2:
+                            updateList[id].password = value;
+                            break;
+                        case 3:
+                            updateList[id].ip = value;
+                            break;
+                        case 4:
+                            updateList[id].port = value;
+                            break;
+                    }
+                });
+
+            });
+
+            sendTo(null, 'updateDevice', updateList);
         }
     </script>
 
@@ -119,23 +133,24 @@
 
         <div class="row">
             <div class="col s12 m4 l2">
-                <img src="template.png" class="logo">
+                <img src="onvif.png" class="logo">
             </div>
         </div>
 
         <!-- List of devices -->
 
         <div class="table-values-div">
-            <table class="table-values centered">
+            <table class="centered highlight">
                 <thead>
                 <tr>
-                    <th class="translate" data-lang="Name">Name</th>
-                    <th class="translate" data-lang="User">User</th>
-                    <th class="translate" data-lang="Password">Password</th>
-                    <th class="translate"></th>
+                    <th class="translate">Name</th>
+                    <th class="translate">User</th>
+                    <th class="translate">Password</th>
+                    <th class="translate">IP</th>
+                    <th class="translate">Port</th>
                 </tr>
                 </thead>
-                <tbody id="groups"></tbody>
+                <tbody id="devices"></tbody>
             </table>
         </div>
 

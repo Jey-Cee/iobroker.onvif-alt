@@ -1,9 +1,9 @@
 {
     "common": {
         "name": "onvif",
-        "version": "0.0.1",
+        "version": "0.1.0",
         "news": {
-            "0.0.1": {
+            "0.1.0": {
                 "en": "initial version created with Adapter-Studio by Jey Cee",
                 "de": "erste Version erstellt mit Adapter-Studio von Jey Cee",
                 "ru": "начальная версия, созданная с помощью Adapter-Studio by Jey Cee",

@@ -121,6 +121,9 @@ class Onvif extends utils.Adapter {
                 case 'getlogs':
                     this.getSystemLog(id);
                     break;
+                case 'scanwifi':
+                    this.scanWifi(id);
+                    break;
                 case 'discover':
                     this.autoDiscover();
                     break;
@@ -151,6 +154,25 @@ class Onvif extends utils.Adapter {
      			// Send response in callback if required
      			if (obj.callback) this.sendTo(obj.from, obj.command, 'Message received', obj.callback);
      		}
+
+     		if(obj.command === 'updateDevice') {
+                let keys = Object.keys(obj.message);
+                for(let k in keys){
+                    this.extendObject(keys[k], {
+                        type: 'device',
+                        common: {
+                            name: obj.message[keys[k]].name
+                        },
+                        native: {
+                            user: obj.message[keys[k]].user,
+                            password: obj.message[keys[k]].password,
+                            ip: obj.message[keys[k]].ip,
+                            port: obj.message[keys[k]].port
+                        }
+                    });
+                }
+
+            }
      	}
     }
 
@@ -170,7 +192,7 @@ class Onvif extends utils.Adapter {
     }
 
     rebootCamera(id){
-         let cam_id = id.replace('.reboot', '');
+         let cam_id = id.replace('.system.reboot', '');
          this.getObject(cam_id, (err, obj)=>{
              if(err){
                  this.log.error(err);
@@ -193,7 +215,7 @@ class Onvif extends utils.Adapter {
             if(err){
                 this.log.error(err);
             }
-            OnvifManager.connect(obj.native.ip)
+            OnvifManager.connect(obj.native.ip, obj.native.port, obj.native.user, obj.native.password)
                 .then(results =>{
                     results.core.getSystemLog('system',(msg)=>{
                         this.log.info(cam_id + ' System Log: ' + JSON.stringify(msg));
@@ -209,7 +231,7 @@ class Onvif extends utils.Adapter {
         })
     }
 
-    scanWifi(id){   //WIP, add catcher for button press and extract interface token
+    scanWifi(id){   //WIP, extract interface token
         let cam_id = id.replace('.network.scanwifi', '');
         this.getObject(cam_id, (err, obj)=>{
             if(err){
@@ -231,8 +253,9 @@ class Onvif extends utils.Adapter {
             OnvifManager.connect(address)
                 .then(results =>{
                     results.core.getNetworkInterfaces((msg)=>{
-                        this.log.info(address + ' get network interfaces: ' + JSON.stringify(msg));
-                        if(msg !== null && msg.statusCode !== 400){
+                        if(msg === null){
+                            this.log.info(address + ' get network interfaces: Not supported');
+                        }else if(msg !== null && msg.statusCode !== 400){
                             this.setObject(cam + '.network.scanwifi', {
                                 type: 'state',
                                 common: {
@@ -271,7 +294,12 @@ class Onvif extends utils.Adapter {
         OnvifManager.connect(address)
             .then(results =>{
                 results.core.getNetworkProtocols((msg)=>{
-                    this.log.info(address + ' get network protocols: ' + JSON.stringify(msg));
+                    if(msg === null){
+                        this.log.info(address + ' get network protocols: Not supported');
+                    }else{
+                        this.log.info(address + ' get network protocols: ' + JSON.stringify(msg));
+                    }
+
                 })
             }, reject => {
                 this.log.error(address + ' get network protocols:' + JSON.stringify(reject));
@@ -282,7 +310,12 @@ class Onvif extends utils.Adapter {
         OnvifManager.connect(address)
             .then(results =>{
                 results.media.getAudioOutputs((msg)=>{
-                    this.log.info(address + ' get audio outputs: ' + JSON.stringify(msg));
+                    if(msg === null){
+                        this.log.info(address + ' get audio outputs: Not supported');
+                    }else {
+                        this.log.info(address + ' get audio outputs: ' + JSON.stringify(msg));
+                    }
+
                 })
             }, reject => {
                 this.log.error(address + ' get audio outputs:' + JSON.stringify(reject));
@@ -293,7 +326,12 @@ class Onvif extends utils.Adapter {
         OnvifManager.connect(address)
             .then(results =>{
                 results.ptz.getNodes((msg)=>{
-                    this.log.info(address + ' get PTZ nodes outputs: ' + JSON.stringify(msg));
+                    if(msg === null){
+                        this.log.info(address + ' get PTZ nodes outputs: Not supported');
+                    }else{
+                        this.log.info(address + ' get PTZ nodes outputs: ' + JSON.stringify(msg));
+                    }
+
                 })
             }, reject => {
                 this.log.error(address + ' get PTZ nodes outputs:' + JSON.stringify(reject));
@@ -304,7 +342,12 @@ class Onvif extends utils.Adapter {
         OnvifManager.connect(address)
             .then(results =>{
                 results.ptz.getNodes((msg)=>{
-                    this.log.info(address + ' get PTZ status: ' + JSON.stringify(msg));
+                    if(msg === null){
+                        this.log.info(address + ' get PTZ status: Not supported');
+                    }else{
+                        this.log.info(address + ' get PTZ status: ' + JSON.stringify(msg));
+                    }
+
                 })
             }, reject => {
                 this.log.error(address + ' get PTZ status:' + JSON.stringify(reject));
@@ -315,7 +358,12 @@ class Onvif extends utils.Adapter {
         OnvifManager.connect(address)
             .then(results =>{
                 results.ptz.getConfigurations((msg)=>{
-                    this.log.info(address + ' get PTZ configurations: ' + JSON.stringify(msg));
+                    if(msg === null){
+                        this.log.info(address + ' get PTZ configurations: Not supported');
+                    }else{
+                        this.log.info(address + ' get PTZ configurations: ' + JSON.stringify(msg));
+                    }
+
                 })
             }, reject => {
                 this.log.error(address + ' get PTZ configurations:' + JSON.stringify(reject));
@@ -325,53 +373,19 @@ class Onvif extends utils.Adapter {
     getPTZPresets(address){
         OnvifManager.connect(address)
             .then(results =>{
-                results.ptz.getPresets((msg)=>{
-                    this.log.info(address + ' get PTZ presets: ' + JSON.stringify(msg));
+                results.ptz.getPresets(null, (msg)=>{
+                    if(msg === null){
+                        this.log.info(address + ' get PTZ presets: Not supported');
+                    }else{
+                        this.log.info(address + ' get PTZ presets: ' + JSON.stringify(msg));
+                    }
+
                 })
             }, reject => {
                 this.log.error(address + ' get PTZ presets:' + JSON.stringify(reject));
             })
     }
 
-    /*
-    startPTZmovement(id){
-        this.log.info('start movment');
-        let device = id.replace('.ptz.start_movement', '');
-        this.getState(device + '.ptz.reference', (err, state)=>{
-            //state.val: 0 = absolute, 1 = relative
-            if(state.val === 0){
-                this.log.info('start movment');
-                this.getObject(device, (err, obj)=>{
-                    let path = obj.native.service.match(/(?<=:\d{2,})\/.*\/.*$/gm);
-                    this.log.info('start movment');
-                    OnvifManager.connect(obj.native.ip, obj.native.port, obj.native.user, obj.native.password, path)
-                        .then(results =>{
-                            this.log.info('start movment');
-                            results.ptz.absoluteMove(null, {x: 5}, null, (msg)=>{
-                                this.log.info(obj.native.ip + ' PTZ start movment: ' + JSON.stringify(msg));
-                            })
-                        }, reject => {
-                            this.log.error(obj.native.ip + ' PTZ start movment:' + JSON.stringify(reject));
-                        })
-                });
-
-            }else if(state.val === 1){
-                this.getObject(device, (err, obj)=>{
-                    let path = obj.native.service.match(/(?<=:\d{2,})\/.*\/.*$/gm);
-                    OnvifManager.connect(obj.native.ip, obj.native.port, obj.native.user, obj.native.password, path)
-                        .then(results =>{
-                            results.ptz.absoluteMove(null, 5, null, (msg)=>{
-                                this.log.info(obj.native.ip + ' PTZ start movment: ' + JSON.stringify(msg));
-                            })
-                        }, reject => {
-                            this.log.error(obj.native.ip + ' PTZ start movment:' + JSON.stringify(reject));
-                        })
-                });
-
-            }
-        })
-    }
-    */
 
     async startPTZmovement(id){
         let device = id.replace('.ptz.start_movement', '');
@@ -382,22 +396,31 @@ class Onvif extends utils.Adapter {
         let object = await this.getObjectAsync(device);
 
 
+        let movement = {};
+        if(x.val !== null && x.val > 0){
+
+            movement.x = x.val;
+        }else{
+            movement.x = 0;
+        }
+
+
+        if(y.val !== null && y.val > 0){
+
+            movement.y = y.val;
+        }else{
+            movement.y = 0;
+        }
+
+        if(z.val !== null && z.val > 0){
+            movement.z = z.val;
+        }else{
+            movement.z = 0;
+        }
+
+
         if(reference.val === 0){
             let path = object.native.service.match(/(?<=:\d{2,})\/.*\/.*$/gm);
-            let movement = {};
-            if(x.val !== ''){
-                movement.x = x.val;
-            }
-            /*
-            if(y.val !== ''){
-                movement.y = y.val;
-            }
-            if(z.val !== '' && z.val !== 0){
-                movement.z = z.val;
-            }
-            */
-
-            this.log.info('movement: ' + JSON.stringify(movement));
 
             OnvifManager.connect(object.native.ip, object.native.port, object.native.user, object.native.password, path)
                 .then(results =>{
@@ -406,36 +429,23 @@ class Onvif extends utils.Adapter {
                         this.log.info(object.native.ip + ' PTZ start movment: ' + JSON.stringify(msg));
                     })
                 }, reject => {
-                    this.log.error(object.native.ip + ' PTZ start movment:' + JSON.stringify(reject));
+                    this.log.error(object.native.ip + ' reject PTZ start movment:' + JSON.stringify(reject));
                 })
 
         }else if(reference.val === 1){
             let path = object.native.service.match(/(?<=:\d{2,})\/.*\/.*$/gm);
-            let movement = {};
-            if(x.val !== ''){
-                movement.x = x.val;
-            }
-            /*
-            if(y.val !== ''){
-                movement.y = y.val;
-            }
-            if(z.val !== '' && z.val !== 0){
-                movement.z = z.val;
-            }
-            */
-
-            this.log.info('movement: ' + JSON.stringify(movement));
 
             OnvifManager.connect(object.native.ip, object.native.port, object.native.user, object.native.password, path)
                 .then(results =>{
                     this.log.info('start movment: ' + JSON.stringify(movement));
-                    results.ptz.relativeMove(null, movement, null, (msg)=>{
+                    results.ptz.relativeMove(null, {x: 1, y: 1, z: 0}, null, (msg)=>{
                         this.log.info(object.native.ip + ' PTZ start movment: ' + JSON.stringify(msg));
                     })
                 }, reject => {
                     this.log.error(object.native.ip + ' PTZ start movment:' + JSON.stringify(reject));
                 })
         }
+
     }
 
 
@@ -841,6 +851,7 @@ class Onvif extends utils.Adapter {
                         user: "",
                         password: "",
                         ip: deviceList[x]['address'],
+                        port: '',
                         urn: deviceList[x]['urn'],
                         service: deviceList[x]['service'],
                         hardware: deviceList[x]['hardware'],
