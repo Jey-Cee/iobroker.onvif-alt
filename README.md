@@ -24,6 +24,15 @@ After a while (~30 seconds) all cameras on your network should be found and obje
 
 ## Changelog
 
+### 0.1.1
+* (jey-cee) check for NetworkVideoTransmitter
+* (jey-cee) connect to cams without credentials
+* (jey-cee) fix getlogs
+* (jey-cee) fix getNetworkProtocols
+* (jey-cee) fix getNetworkInterfaces
+* (jey-cee) show Audio Outputs in log only, WIP help needed
+* (jey-cee) read and execute presets
+
 ### 0.1.0
 * (jey-cee) fixed get system log
 * (jey-cee) fixed reboot

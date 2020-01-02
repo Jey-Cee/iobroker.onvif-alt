@@ -44,7 +44,7 @@ class Onvif extends utils.Adapter {
      */
     async onReady() {
 
-
+        /*
         if(this.config.ffmpeg_installed === false){
             this.log.info('Checking for ffmpeg');
             fs.access(`${__dirname}/lib/ffmpeg`, fs.constants.F_OK, (err) => {
@@ -59,6 +59,8 @@ class Onvif extends utils.Adapter {
             });
 
         }
+        */
+
 
         this.autoDiscover();
 
@@ -111,6 +113,13 @@ class Onvif extends utils.Adapter {
             let tmp = id.split('.');
             let dp = tmp.pop();
 
+            let patt = new RegExp('presets');
+            let presets = patt.test(id);
+            if(presets === true){
+                console.log(id);
+                dp = 'presets';
+            }
+
             switch (dp){
                 case 'snapshot':
                     break;
@@ -132,6 +141,9 @@ class Onvif extends utils.Adapter {
                     break;
                 case 'start_movement':
                     this.startPTZmovement(id);
+                    break;
+                case 'presets':
+                    this.gotoPTZPreset(id);
                     break;
             }
         } else {
@@ -200,7 +212,7 @@ class Onvif extends utils.Adapter {
              OnvifManager.connect(obj.native.ip)
                  .then(results =>{
                         results.core.systemReboot((msg)=>{
-                            this.log.info(cam_id + ' reboot: ' + JSON.stringify(msg));
+                            this.log.info(cam_id + ' reboot: ' + this.beautifyMsg(msg));
                         })
                  }, reject => {
                      this.log.error(cam_id + ' reboot:' + JSON.stringify(reject));
@@ -209,20 +221,20 @@ class Onvif extends utils.Adapter {
          })
     }
 
-    getSystemLog(id){
+    async getSystemLog(id){
         let cam_id = id.replace('.logs.getlogs', '');
         this.getObject(cam_id, (err, obj)=>{
             if(err){
                 this.log.error(err);
             }
             OnvifManager.connect(obj.native.ip, obj.native.port, obj.native.user, obj.native.password)
-                .then(results =>{
-                    results.core.getSystemLog('system',(msg)=>{
-                        this.log.info(cam_id + ' System Log: ' + JSON.stringify(msg));
+                .then(async results =>{
+                    results.core.getSystemLog('System',(msg)=>{
+                        this.log.info(cam_id + ' System Log: ' + this.beautifyMsg(msg));
                         this.setState(cam_id + '.logs.systemlog', {val: JSON.stringify(msg), ack: true});
                     });
-                    results.core.getSystemLog('access',(msg)=>{
-                        this.log.info(cam_id + ' Access Log: ' + JSON.stringify(msg));
+                    results.core.getSystemLog('Access',(msg)=>{
+                        this.log.info(cam_id + ' Access Log: ' + this.beautifyMsg(msg));
                         this.setState(cam_id + '.logs.accesslog', {val: JSON.stringify(msg), ack: true});
                     });
                 }, reject => {
@@ -249,143 +261,606 @@ class Onvif extends utils.Adapter {
         })
     }
 
-    getNetworkInterfaces(address, cam){
+    async getNetworkInterfaces(address){
             OnvifManager.connect(address)
-                .then(results =>{
-                    results.core.getNetworkInterfaces((msg)=>{
-                        if(msg === null){
-                            this.log.info(address + ' get network interfaces: Not supported');
-                        }else if(msg !== null && msg.statusCode !== 400){
-                            this.setObject(cam + '.network.scanwifi', {
-                                type: 'state',
-                                common: {
-                                    name: 'Scan for available Wifi networks ',
-                                    type: 'boolean',
-                                    role: 'button',
-                                    read: false,
-                                    write: true
-                                },
-                                native: {
+                .then(async results =>{
+                    let cam = await this.lookForDev(results.address, null);
+                    results.core.getNetworkInterfaces()
+                        .then(results => {
+                            let name, token, enabled, hwAddress, ip_manual, ip_dhcp, ip_linkLocal, dhcp, ipv4_enabled, ipv6_dhcp, ipv6_enabled, ipv6_ip_dhcp, ipv6_ip_manual, ipv6_ip_link_local, ipv6_router_advert;
+                            let ifaces = results.data.GetNetworkInterfacesResponse;
+                            for(let i in ifaces){
+                                name = ifaces[i]['Info']['Name'];
+                                token = ifaces[i]['$']['token'];
+                                enabled = ifaces[i]['Enabled'];
+                                hwAddress = ifaces[i]['Info']['HwAddress'];
 
+                                this.setObject(cam + '.network.' + token, {
+                                    type: 'channel',
+                                    common: {
+                                        name: 'Network interface ' + token
+                                    },
+                                    native: {
+                                        token: token,
+                                        name: name,
+                                        hwAddress: hwAddress
+                                    }
+                                });
+
+                                this.setObjectNotExists(cam + '.network.' + token + '.enabled', {
+                                    type: 'state',
+                                    common: {
+                                        name: 'Interfaces enabled',
+                                        type: 'boolean',
+                                        role: 'indicator',
+                                        read: true,
+                                        write: false,
+                                    },
+                                    native: {
+
+                                    }
+                                });
+
+                                this.setState(cam + '.network.' + token + '.enabled', {val: enabled, ack: true});
+
+                                //IPv4
+                                if(ifaces[i]['IPv4'] !== undefined) {
+                                    if (ifaces[i]['IPv4']['Enabled'] !== undefined) {
+                                        ipv4_enabled = ifaces[i]['IPv4']['Enabled'];
+
+                                        this.setObjectNotExists(cam + '.network.' + token + '.ipv4_enabled', {
+                                            type: 'state',
+                                            common: {
+                                                name: 'IPv4 enabled',
+                                                type: 'boolean',
+                                                role: 'indicator',
+                                                read: true,
+                                                write: false,
+                                            },
+                                            native: {
+
+                                            }
+                                        });
+
+                                        this.setState(cam + '.network.' + token + '.ipv4_enabled', {val: ipv4_enabled, ack: true});
+                                    }
+                                    if (ifaces[i]['IPv4']['Config']['Manual'] !== undefined) {
+                                        ip_manual = ifaces[i]['IPv4']['Config']['Manual']['Address'];
+
+                                        this.setObjectNotExists(cam + '.network.' + token + '.ipv4_manual', {
+                                            type: 'state',
+                                            common: {
+                                                name: 'IPv4 manual',
+                                                type: 'string',
+                                                role: 'indicator',
+                                                read: true,
+                                                write: false,
+                                            },
+                                            native: {
+
+                                            }
+                                        });
+
+                                        this.setState(cam + '.network.' + token + '.ipv4_manual', {val: ip_manual, ack: true});
+                                    }
+
+                                    if (ifaces[i]['IPv4']['Config']['FromDHCP'] !== undefined) {
+                                        ip_dhcp = ifaces[i]['IPv4']['Config']['FromDHCP']['Address'];
+
+                                        this.setObjectNotExists(cam + '.network.' + token + '.ipv4_dhcp', {
+                                            type: 'state',
+                                            common: {
+                                                name: 'IPv4 DHCP',
+                                                type: 'string',
+                                                role: 'indicator',
+                                                read: true,
+                                                write: false,
+                                            },
+                                            native: {
+
+                                            }
+                                        });
+
+                                        this.setState(cam + '.network.' + token + '.ipv4_dhcp', {val: ip_dhcp, ack: true});
+                                    }
+
+                                    if (ifaces[i]['IPv4']['Config']['LinkLocal'] !== undefined) {
+                                        ip_linkLocal = ifaces[i]['IPv4']['Config']['LinkLocal']['Address'];
+
+                                        this.setObjectNotExists(cam + '.network.' + token + '.ipv4_link_local', {
+                                            type: 'state',
+                                            common: {
+                                                name: 'IPv4 Link Local',
+                                                type: 'string',
+                                                role: 'indicator',
+                                                read: true,
+                                                write: false,
+                                            },
+                                            native: {
+
+                                            }
+                                        });
+
+                                        this.setState(cam + '.network.' + token + '.ipv4_link_local', {val: ip_linkLocal, ack: true});
+                                    }
+
+                                    if(ifaces[i]['IPv4']['Config']['DHCP'] !== undefined) {
+                                        dhcp = ifaces[i]['IPv4']['Config']['DHCP'];
+                                        this.setObjectNotExists(cam + '.network.' + token + '.ipv4_dhcp', {
+                                            type: 'state',
+                                            common: {
+                                                name: 'IPv4 DHCP enabled',
+                                                type: 'boolean',
+                                                role: 'indicator',
+                                                read: true,
+                                                write: false,
+                                            },
+                                            native: {}
+                                        });
+
+                                        this.setState(cam + '.network.' + token + '.dhcp', {val: dhcp, ack: true});
+                                    }
                                 }
-                            });
 
-                            this.setObject(cam + '.network.availablewifi', {
-                                type: 'state',
-                                common: {
-                                    name: 'Available Wifi networks ',
-                                    type: 'string',
-                                    role: 'text',
-                                    read: true,
-                                    write: false
-                                },
-                                native: {
+                                //IPv6
+                                if(ifaces[i]['IPv6'] !== undefined){
+                                    if(ifaces[i]['IPv6']['Enabled'] !== undefined){
+                                        ipv6_enabled = ifaces[i]['IPv6']['Enabled'];
+                                        this.setObjectNotExists(cam + '.network.' + token + '.ipv6_enabled', {
+                                            type: 'state',
+                                            common: {
+                                                name: 'IPv6 enabled',
+                                                type: 'boolean',
+                                                role: 'indicator',
+                                                read: true,
+                                                write: false,
+                                            },
+                                            native: {
 
+                                            }
+                                        });
+
+                                        this.setState(cam + '.network.' + token + '.ipv6_enabled', {val: ipv6_enabled, ack: true});
+                                    }
+
+                                    if(ifaces[i]['IPv6']['Config']['DHCP'] !== undefined){
+                                        ipv6_dhcp = ifaces[i]['IPv6']['Config']['DHCP'];
+                                        this.setObjectNotExists(cam + '.network.' + token + '.ipv6_dhcp', {
+                                            type: 'state',
+                                            common: {
+                                                name: 'IPv6 DHCP',
+                                                type: 'string',
+                                                role: 'indicator',
+                                                read: true,
+                                                write: false,
+                                            },
+                                            native: {
+
+                                            }
+                                        });
+
+                                        this.setState(cam + '.network.' + token + '.ipv6_dhcp', {val: ipv6_dhcp, ack: true});
+                                    }
+
+                                    if(ifaces[i]['IPv6']['Config'][''] !== undefined){
+                                        ipv6_router_advert = ifaces[i]['IPv6']['Config']['AcceptRouterAdvert'];
+                                        this.setObjectNotExists(cam + '.network.' + token + '.ipv6_AcceptRouterAdvert', {
+                                            type: 'state',
+                                            common: {
+                                                name: 'IPv6 Accept Router Advert',
+                                                type: 'boolean',
+                                                role: 'indicator',
+                                                read: true,
+                                                write: false,
+                                            },
+                                            native: {
+
+                                            }
+                                        });
+
+                                        this.setState(cam + '.network.' + token + '.ipv6_AcceptRouterAdvert', {val: ipv6_router_advert, ack: true});
+                                    }
+
+                                    if(ifaces[i]['IPv6']['Config']['FromDHCP'] !== undefined){
+                                        ipv6_ip_dhcp = ifaces[i]['IPv6']['Config']['FromDHCP']['Address'];
+                                        this.setObjectNotExists(cam + '.network.' + token + '.ipv6_ip_dhcp', {
+                                            type: 'state',
+                                            common: {
+                                                name: 'IPv6 IP from DHCP',
+                                                type: 'string',
+                                                role: 'indicator',
+                                                read: true,
+                                                write: false,
+                                            },
+                                            native: {
+
+                                            }
+                                        });
+
+                                        this.setState(cam + '.network.' + token + '.ipv6_ip_dhcp', {val: ipv6_ip_dhcp, ack: true});
+                                    }
+
+                                    if(ifaces[i]['IPv6']['Config']['Manual'] !== undefined){
+                                        ipv6_ip_manual = ifaces[i]['IPv6']['Config']['Manual']['Address'];
+                                        this.setObjectNotExists(cam + '.network.' + token + '.ipv6_ip_manual', {
+                                            type: 'state',
+                                            common: {
+                                                name: 'IPv6 IP manual',
+                                                type: 'string',
+                                                role: 'indicator',
+                                                read: true,
+                                                write: false,
+                                            },
+                                            native: {
+
+                                            }
+                                        });
+
+                                        this.setState(cam + '.network.' + token + '.ipv6_ip_manual', {val: ipv6_ip_manual, ack: true});
+                                    }
+
+                                    if(ifaces[i]['IPv6']['Config']['LinkLocal'] !== undefined){
+                                        ipv6_ip_link_local = ifaces[i]['IPv6']['Config']['LinkLocal']['Address'];
+                                        this.setObjectNotExists(cam + '.network.' + token + '.ipv6_ip_link_local', {
+                                            type: 'state',
+                                            common: {
+                                                name: 'IPv6 IP Link Local',
+                                                type: 'string',
+                                                role: 'indicator',
+                                                read: true,
+                                                write: false,
+                                            },
+                                            native: {
+
+                                            }
+                                        });
+
+                                        this.setState(cam + '.network.' + token + '.ipv6_ip_link_local', {val: ipv6_ip_link_local, ack: true});
+                                    }
                                 }
-                            });
-                        }
-                    })
+
+                            }
+
+                        }, reject => {
+                            this.log.error(address + ' get network interfaces:' + JSON.stringify(reject));
+                        });
                 }, reject => {
                     this.log.error(address + ' get network interfaces:' + JSON.stringify(reject));
                 })
     }
 
-    getNetworkProtocols(address, cam){
+    async getNetworkProtocols(address){
         OnvifManager.connect(address)
-            .then(results =>{
-                results.core.getNetworkProtocols((msg)=>{
-                    if(msg === null){
-                        this.log.info(address + ' get network protocols: Not supported');
-                    }else{
-                        this.log.info(address + ' get network protocols: ' + JSON.stringify(msg));
-                    }
+            .then(async results =>{
+                let cam = await this.lookForDev(results.address, null);
+                results.core.getNetworkProtocols()
+                    .then(async results => {
+                        let netProtocols = results.data.GetNetworkProtocolsResponse.NetworkProtocols;
 
-                })
+                        let name, enabled, port;
+                        if(netProtocols.length !== undefined){
+                            for(let n in netProtocols){
+
+                                name = netProtocols[n]['Name'];
+                                enabled = netProtocols[n]['Enabled'];
+                                port = netProtocols[n]['Port'];
+
+                                await this.createProtocolObjects(cam, name, enabled, port);
+                            }
+                        }else{
+                            name = netProtocols['Name'];
+                            enabled = netProtocols['Enabled'];
+                            port = netProtocols['Port'];
+
+                            await this.createProtocolObjects(cam, name, enabled, port);
+                        }
+
+                    }, reject => {
+                        this.log.error(address + ' get network protocols:' + JSON.stringify(reject));
+                    })
             }, reject => {
                 this.log.error(address + ' get network protocols:' + JSON.stringify(reject));
             })
     }
 
-    getAudioOutputs(address, cam){
-        OnvifManager.connect(address)
-            .then(results =>{
-                results.media.getAudioOutputs((msg)=>{
-                    if(msg === null){
-                        this.log.info(address + ' get audio outputs: Not supported');
-                    }else {
-                        this.log.info(address + ' get audio outputs: ' + JSON.stringify(msg));
-                    }
+    async createProtocolObjects(cam, name, enabled, port){
+        this.setObjectNotExists(cam + '.network.protocols', {
+            type: 'channel',
+            common: {
+                name: 'Network protocols'
+            },
+            native: {
 
-                })
+            }
+        });
+
+        this.setObjectNotExists(cam + '.network.protocols.' + name, {
+            type: 'channel',
+            common: {
+                name: name + ' protocol',
+            },
+            native: {
+
+            }
+        });
+
+        this.setObjectNotExists(cam + '.network.protocols.' + name + '.enabled', {
+            type: 'state',
+            common: {
+                name: 'Protocol enabled',
+                type: 'boolean',
+                role: 'indicator',
+                read: true,
+                write: false,
+            },
+            native: {
+
+            }
+        });
+
+        this.setState(cam + '.network.protocols.' + name + '.enabled', {val: enabled, ack: true});
+
+        this.setObjectNotExists(cam + '.network.protocols.' + name + '.port', {
+            type: 'state',
+            common: {
+                name: 'Port',
+                type: 'number',
+                role: 'indicator',
+                read: true,
+                write: false,
+            },
+            native: {
+
+            }
+        });
+
+        this.setState(cam + '.network.protocols.' + name + '.port', {val: port, ack: true});
+
+        return true;
+    }
+
+    async getAudioOutputs(address, cam){
+        OnvifManager.connect(address)
+            .then(async results =>{
+                results.media.getAudioOutputs()
+                    .then(async results => {
+                        this.log.info(JSON.stringify('get Audio outputs: ' + JSON.stringify(results.data.GetAudioOutputsResponse)));
+                    }, reject => {
+                        this.log.error(address + ' get audio outputs:' + JSON.stringify(reject));
+                    })
             }, reject => {
                 this.log.error(address + ' get audio outputs:' + JSON.stringify(reject));
             })
     }
 
-    getPTZNodes(address){
+    async getPTZNodes(address){
         OnvifManager.connect(address)
-            .then(results =>{
-                results.ptz.getNodes((msg)=>{
-                    if(msg === null){
-                        this.log.info(address + ' get PTZ nodes outputs: Not supported');
-                    }else{
-                        this.log.info(address + ' get PTZ nodes outputs: ' + JSON.stringify(msg));
-                    }
-
-                })
+            .then(async results =>{
+                results.ptz.getNodes()
+                    .then(async results => {
+                        console.log(results.data.GetNodesResponse.PTZNode.SupportedPTZSpaces);
+                    }, reject => {
+                        this.log.error(address + ' get PTZ nodes outputs:' + JSON.stringify(reject));
+                    })
             }, reject => {
                 this.log.error(address + ' get PTZ nodes outputs:' + JSON.stringify(reject));
             })
     }
 
-    getPTZStatus(address){
+    async getPTZStatus(address){
         OnvifManager.connect(address)
             .then(results =>{
-                results.ptz.getNodes((msg)=>{
-                    if(msg === null){
-                        this.log.info(address + ' get PTZ status: Not supported');
-                    }else{
-                        this.log.info(address + ' get PTZ status: ' + JSON.stringify(msg));
-                    }
-
-                })
+                results.ptz.getStatus()
+                    .then(async results => {
+                        console.log(results.data.GetStatusResponse.PTZStatus.Position);
+                    }, reject => {
+                        this.log.error(address + ' get PTZ status:' + JSON.stringify(reject));
+                    })
             }, reject => {
                 this.log.error(address + ' get PTZ status:' + JSON.stringify(reject));
             })
     }
 
-    getPTZConfigurations(address){
+    async getPTZConfigurations(address){
         OnvifManager.connect(address)
-            .then(results =>{
-                results.ptz.getConfigurations((msg)=>{
-                    if(msg === null){
-                        this.log.info(address + ' get PTZ configurations: Not supported');
-                    }else{
-                        this.log.info(address + ' get PTZ configurations: ' + JSON.stringify(msg));
-                    }
+            .then(async results =>{
+                let cam = await this.lookForDev(results.address, null);
+                results.ptz.getConfigurations()
+                    .then(async results => {
+                        //console.log(results.data.GetConfigurationsResponse.PTZConfiguration);
+                        if(results === null){
+                            this.log.info(address + ' get PTZ configurations: Not supported');
+                        }else{
+                            this.log.info(address + ' get PTZ configurations: ' + JSON.stringify(results.data.GetConfigurationsResponse));
+                            let confs = results.data.GetConfigurationsResponse;
+                            let name, useCount, nodeToken, PTZspeedX, PTZspeedY, PTZspeedZ, PTZTimeout, xRangeMin, xRangeMax, yRangeMin, yRangeMax, zRangeMin, zRangeMax;
 
-                })
+                            if(Object.keys(confs).length > 1){
+                                for(let c in confs){
+                                    console.log(Object.keys(confs).length);
+                                    name = confs[c]['Name'];
+                                    useCount = confs[c]['UseCount'];
+                                    nodeToken = confs[c]['NodeToken'];
+                                    PTZspeedX = confs[c]['DefaultPTZSpeed'];
+                                    PTZTimeout = confs[c]['DefaultPTZTimeout'];
+
+                                    console.log(confs[c]);
+
+                                    //TODO: get information for multiple configurations and create option to choose
+                                }
+                            }else if(Object.keys(confs).length === 1){
+                                name = confs['PTZConfiguration']['Name'];
+                                useCount = confs['PTZConfiguration']['UseCount'];
+                                nodeToken = confs['PTZConfiguration']['NodeToken'];
+                                PTZspeedX = confs['PTZConfiguration']['DefaultPTZSpeed']['PanTilt']['$']['x'];
+                                PTZspeedY = confs['PTZConfiguration']['DefaultPTZSpeed']['PanTilt']['$']['y'];
+                                PTZTimeout = confs['PTZConfiguration']['DefaultPTZTimeout'];
+
+                                //TODO: write information to an object, which one?
+
+
+                                if(confs['PTZConfiguration']['PanTiltLimits']['Range']['XRange']){
+                                    xRangeMin = confs['PTZConfiguration']['PanTiltLimits']['Range']['XRange']['Min'];
+                                    xRangeMax = confs['PTZConfiguration']['PanTiltLimits']['Range']['XRange']['Max'];
+                                    this.setObjectNotExists(cam + '.ptz.x', {
+                                        type: 'state',
+                                        common: {
+                                            name: 'X position for camera',
+                                            type: 'number',
+                                            role: 'state',
+                                            read: true,
+                                            write: true,
+                                            min: xRangeMin,
+                                            max: xRangeMax,
+                                            def: 0
+                                        },
+                                        native: {
+
+                                        }
+                                    });
+                                }
+
+                                if(confs['PTZConfiguration']['PanTiltLimits']['Range']['YRange']) {
+                                    yRangeMin = confs['PTZConfiguration']['PanTiltLimits']['Range']['YRange']['Min'];
+                                    yRangeMax = confs['PTZConfiguration']['PanTiltLimits']['Range']['YRange']['Max'];
+                                    this.setObjectNotExists(cam + '.ptz.y', {
+                                        type: 'state',
+                                        common: {
+                                            name: 'Y position for camera',
+                                            type: 'number',
+                                            role: 'state',
+                                            read: true,
+                                            write: true,
+                                            min: yRangeMin,
+                                            max: yRangeMax,
+                                            def: 0
+                                        },
+                                        native: {}
+                                    });
+                                }
+
+
+                                this.setObjectNotExists(cam + '.ptz.z', {
+                                    type: 'state',
+                                    common: {
+                                        name: 'Zoom',
+                                        type: 'number',
+                                        role: 'state',
+                                        read: true,
+                                        write: true,
+                                        def: 0
+                                    },
+                                    native: {
+
+                                    }
+                                });
+
+                            }
+
+                        }
+                    }, reject => {
+                        this.log.error(address + ' get PTZ configurations: ' + this.beautifyMsg(reject))
+                    })
+
             }, reject => {
                 this.log.error(address + ' get PTZ configurations:' + JSON.stringify(reject));
             })
     }
 
-    getPTZPresets(address){
+    getPTZConfiguration(address, confToken){
         OnvifManager.connect(address)
             .then(results =>{
-                results.ptz.getPresets(null, (msg)=>{
+                let token;
+                if(confToken === null){
+                    token = results.profileList.PTZConfiguration.$.token;
+                }else{
+                    token = confToken;
+                }
+                results.ptz.getConfiguration(token, (msg)=>{
                     if(msg === null){
-                        this.log.info(address + ' get PTZ presets: Not supported');
+                        this.log.info(address + ' get PTZ configuration: Not supported');
                     }else{
-                        this.log.info(address + ' get PTZ presets: ' + JSON.stringify(msg));
+                        this.log.info(address + ' get PTZ configuration: ' + this.beautifyMsg(msg));
                     }
 
                 })
+            }, reject => {
+                this.log.error(address + ' get PTZ configuration:' + JSON.stringify(reject));
+            })
+    }
+
+    async getPTZPresets(address, profileToken){
+         OnvifManager.connect(address)
+            .then(async results =>{
+                let token;
+                if(profileToken === null){
+                    token = results.ptz.defaultProfileToken;
+                }else{
+                    token = profileToken;
+                }
+
+                let cam = await this.lookForDev(results.address, null);
+
+                results.ptz.getPresets( token )
+                    .then(results =>{
+                        let presets = results.data.GetPresetsResponse.Preset;
+                        for(let p in presets){
+                            this.setObjectNotExists(cam + '.ptz.presets.' + presets[p]['Name'], {
+                                type: 'state',
+                                common: {
+                                    name: presets[p]['Name'],
+                                    type: 'boolean',
+                                    role: 'button',
+                                    read: true,
+                                    write: true
+                                },
+                                native: {
+                                    xsi_type: presets[p]['$']['xsi:type'],
+                                    token: presets[p]['$']['token']
+                                }
+                            });
+                        }
+                }, reject => {
+                        this.log.error(address + ' get PTZ presets:' + JSON.stringify(reject));
+                    });
+
             }, reject => {
                 this.log.error(address + ' get PTZ presets:' + JSON.stringify(reject));
             })
     }
 
+    async gotoPTZPreset(id, profileToken){
+         let dev = id.replace(/\.ptz.*/g, '');
+         let device = await this.getObjectAsync(dev);
+         let address = device.native.ip;
+        OnvifManager.connect(address)
+            .then(async results => {
+                let preset = await this.getObjectAsync(id);
+                let presetToken = preset.native.token;
+
+                let speed_x = await this.getStateAsync(dev + '.ptz.speed.x');
+                let speed_y = await this.getStateAsync(dev + '.ptz.speed.y');
+                let speed_z = await this.getStateAsync(dev + '.ptz.speed.z');
+                let speed = {x: speed_x.val, y: speed_y.val, z: speed_z.val};
+
+                let token;
+                if (profileToken === null) {
+                    token = results.ptz.defaultProfileToken;
+                } else {
+                    token = profileToken;
+                }
+
+
+                results.ptz.gotoPreset( token, presetToken, speed )
+                    .then(results =>{
+                        this.log.info('PTZ goto preset: ' + JSON.stringify(results.data));
+                    }, reject =>{
+                        this.log.error('PTZ goto preset: ' + JSON.stringify(reject));
+                    });
+
+
+            });
+    }
 
     async startPTZmovement(id){
         let device = id.replace('.ptz.start_movement', '');
@@ -393,26 +868,28 @@ class Onvif extends utils.Adapter {
         let y = await this.getStateAsync(device + '.ptz.y');
         let z = await this.getStateAsync(device + '.ptz.z');
         let reference = await this.getStateAsync(device + '.ptz.reference');
+        let speed_x = await this.getStateAsync(device + '.ptz.speed.x');
+        let speed_y = await this.getStateAsync(device + '.ptz.speed.y');
+        let speed_z = await this.getStateAsync(device + '.ptz.speed.z');
         let object = await this.getObjectAsync(device);
 
+        let speed = {x: speed_x.val, y: speed_y.val, z: speed_z.val};
 
         let movement = {};
-        if(x.val !== null && x.val > 0){
+        if(x.val !== null){
 
             movement.x = x.val;
         }else{
             movement.x = 0;
         }
 
-
-        if(y.val !== null && y.val > 0){
-
+        if(y.val !== null){
             movement.y = y.val;
         }else{
             movement.y = 0;
         }
 
-        if(z.val !== null && z.val > 0){
+        if(z.val !== null){
             movement.z = z.val;
         }else{
             movement.z = 0;
@@ -423,11 +900,19 @@ class Onvif extends utils.Adapter {
             let path = object.native.service.match(/(?<=:\d{2,})\/.*\/.*$/gm);
 
             OnvifManager.connect(object.native.ip, object.native.port, object.native.user, object.native.password, path)
-                .then(results =>{
-                    this.log.info('start movment: ' + JSON.stringify(movement));
-                    results.ptz.absoluteMove(null, movement, null, (msg)=>{
-                        this.log.info(object.native.ip + ' PTZ start movment: ' + JSON.stringify(msg));
-                    })
+                .then(async results =>{
+                    this.log.debug('start movment: ' + JSON.stringify(movement));
+                    results.ptz.absoluteMove(null, movement, speed)
+                        .then(async results => {
+                            if(results.data.AbsoluteMoveResponse !== ''){
+                                this.log.info(object.native.ip + ' PTZ start movment: ' + JSON.stringify(results.data));
+                            }
+
+                        }, reject => {
+                            this.log.info(object.native.ip + ' PTZ start movment: ' + JSON.stringify(reject));
+                        });
+
+
                 }, reject => {
                     this.log.error(object.native.ip + ' reject PTZ start movment:' + JSON.stringify(reject));
                 })
@@ -436,19 +921,22 @@ class Onvif extends utils.Adapter {
             let path = object.native.service.match(/(?<=:\d{2,})\/.*\/.*$/gm);
 
             OnvifManager.connect(object.native.ip, object.native.port, object.native.user, object.native.password, path)
-                .then(results =>{
+                .then(async results =>{
                     this.log.info('start movment: ' + JSON.stringify(movement));
-                    results.ptz.relativeMove(null, {x: 1, y: 1, z: 0}, null, (msg)=>{
-                        this.log.info(object.native.ip + ' PTZ start movment: ' + JSON.stringify(msg));
-                    })
+                    results.ptz.relativeMove(null, {x: 1, y: 1, z: 0}, speed)
+                        .then(async results =>{
+                            this.log.info(object.native.ip + ' PTZ start movment: ' + JSON.stringify(results.data));
+                        }, reject =>{
+                            this.log.info(object.native.ip + ' PTZ start movment: ' + JSON.stringify(reject));
+                        });
+
+
                 }, reject => {
                     this.log.error(object.native.ip + ' PTZ start movment:' + JSON.stringify(reject));
                 })
         }
 
     }
-
-
 
     stopMovement(id){
          let device = id.replace('.ptz.stop_movement', '');
@@ -457,7 +945,7 @@ class Onvif extends utils.Adapter {
              OnvifManager.connect(obj.native.ip, obj.native.port, obj.native.user, obj.native.password, path)
                  .then(results =>{
                      results.ptz.stop(null, null, null,(msg)=>{
-                         this.log.info(obj.native.ip + ' PTZ stop movment: ' + JSON.stringify(msg));
+                         this.log.info(obj.native.ip + ' PTZ stop movment: ' + this.beautifyMsg(msg));
                      })
                  }, reject => {
                      this.log.error(obj.native.ip + ' PTZ stop movment:' + JSON.stringify(reject));
@@ -490,18 +978,29 @@ class Onvif extends utils.Adapter {
                             //this.log.error('Connect to cams:' + JSON.stringify(reject));
                             this.log.error('Connect to cams:' + ip + ' ' + JSON.stringify(reject));
                         })
-                }
+                }else{
 
+                ip = devices[x].native.ip;
+                port = devices[x].native.service.match(/(?<=:)\d{2,}/gm);
+                path = devices[x].native.service.match(/(?<=:\d{2,})\/.*\/.*$/gm);
 
+                await OnvifManager.connect(ip,port, path)
+                    .then(results => {
+                        this.log.info('results: ' + JSON.stringify(results));
+                        let camera = results;
+                        let c = this.createStatesByServices(camera);
+                        let d = this.updateMainInfo(camera);
+                    }, reject => {
+                        //this.log.error('Connect to cams:' + JSON.stringify(reject));
+                        this.log.error('Connect to cams:' + ip + ' ' + JSON.stringify(reject));
+                    })
             }
-
-
+        }
     }
 
-    createStatesByServices(list){
+    async createStatesByServices(list){
          //extend device object with additional information
-        this.lookForDev(list.address, null, (id)=>{
-            this.log.info(id);
+        let id = await this.lookForDev(list.address, null);
             let cam = id.replace(/onvif.\d./g, '');
             //create objects for each profile
             for(let x in list.profileList){
@@ -612,7 +1111,8 @@ class Onvif extends utils.Adapter {
                         use_count: l['PTZConfiguration']['UseCount'],
                         token: l['PTZConfiguration']['$']['token'],
                         session_timeout: l['PTZConfiguration']['DefaultPTZTimeout']
-                    }
+                    };
+                    //this.getPTZConfiguration(list.address, l['PTZConfiguration']['$']['token']);
                 }
 
                 this.setObject(cam + '.profiles.' + x, {
@@ -683,47 +1183,7 @@ class Onvif extends utils.Adapter {
                     }
                 });
 
-                this.setObjectNotExists(cam + '.ptz.x', {
-                    type: 'state',
-                    common: {
-                        name: 'X position for camera',
-                        type: 'number',
-                        role: 'state',
-                        read: true,
-                        write: true
-                    },
-                    native: {
 
-                    }
-                });
-
-                this.setObjectNotExists(cam + '.ptz.y', {
-                    type: 'state',
-                    common: {
-                        name: 'Y position for camera',
-                        type: 'number',
-                        role: 'state',
-                        read: true,
-                        write: true
-                    },
-                    native: {
-
-                    }
-                });
-
-                this.setObjectNotExists(cam + '.ptz.z', {
-                    type: 'state',
-                    common: {
-                        name: 'Zoom',
-                        type: 'number',
-                        role: 'state',
-                        read: true,
-                        write: true
-                    },
-                    native: {
-
-                    }
-                });
 
                 this.setObjectNotExists(cam + '.ptz.reference', {
                     type: 'state',
@@ -735,6 +1195,51 @@ class Onvif extends utils.Adapter {
                         write: true,
                         def: 0,
                         states: {0:'absolute',1:'relative'}
+                    },
+                    native: {
+
+                    }
+                });
+
+                this.setObjectNotExists(cam + '.ptz.speed.x', {
+                    type: 'state',
+                    common: {
+                        name: 'Speed for x',
+                        type: 'number',
+                        role: 'state',
+                        read: true,
+                        write: true,
+                        def: 0.5
+                    },
+                    native: {
+
+                    }
+                });
+
+                this.setObjectNotExists(cam + '.ptz.speed.y', {
+                    type: 'state',
+                    common: {
+                        name: 'Speed for y',
+                        type: 'number',
+                        role: 'state',
+                        read: true,
+                        write: true,
+                        def: 0.5
+                    },
+                    native: {
+
+                    }
+                });
+
+                this.setObjectNotExists(cam + '.ptz.speed.z', {
+                    type: 'state',
+                    common: {
+                        name: 'Speed for z',
+                        type: 'number',
+                        role: 'state',
+                        read: true,
+                        write: true,
+                        def: 0.5
                     },
                     native: {
 
@@ -770,10 +1275,10 @@ class Onvif extends utils.Adapter {
                 });
 
 
-                this.getPTZNodes(list.address);
-                this.getPTZStatus(list.address);
+                //this.getPTZNodes(list.address);
+                //this.getPTZStatus(list.address);
                 this.getPTZConfigurations(list.address);
-                this.getPTZPresets(list.address);
+                this.getPTZPresets(list.address, null);
             }
 
 
@@ -781,54 +1286,55 @@ class Onvif extends utils.Adapter {
             this.getNetworkInterfaces(list.address, cam);
             this.getNetworkProtocols(list.address, cam);
             this.getAudioOutputs(list.address, cam);
-        })
 
     }
 
-    updateMainInfo(list){
+    async updateMainInfo(list){
         let dInfo = list.deviceInformation;
-        this.lookForDev(list.address, null, (id)=>{
-            this.log.info(id);
-            this.extendObject(id, {
-                native: {
-                    port: list.port[0],
-                    manufacturer: dInfo.Manufacturer,
-                    model: dInfo.Model,
-                    firmware: dInfo.FirmwareVersion,
-                    serial: dInfo.SerialNumber,
-                    hardware_id: dInfo.HardwareId,
-                    ptz: dInfo.Ptz,
-                    video_encoder: dInfo.VideoEncoder,
-                    name: dInfo.Name,
-                    hardware: dInfo.Hardware,
-                    profile_s: dInfo.ProfileS,
-                    country: dInfo.Country,
-                    city: dInfo.City
+        let id = await this.lookForDev(list.address, null);
 
-                }
-            })
+                this.extendObject(id, {
+                    native: {
+                        port: list.port[0],
+                        manufacturer: dInfo.Manufacturer,
+                        model: dInfo.Model,
+                        firmware: dInfo.FirmwareVersion,
+                        serial: dInfo.SerialNumber,
+                        hardware_id: dInfo.HardwareId,
+                        ptz: dInfo.Ptz,
+                        video_encoder: dInfo.VideoEncoder,
+                        name: dInfo.Name,
+                        hardware: dInfo.Hardware,
+                        profile_s: dInfo.ProfileS,
+                        country: dInfo.Country,
+                        city: dInfo.City
+                    }
+                });
 
-        })
     }
 
-    lookForDev(ip, urn, callback){
-        this.getDevices((err, devices)=>{
-            for(let x in devices){
-                let ipCheck = false;
-                let urnCheck = false;
+    async lookForDev(ip, urn){
+        let id = await this.getDevicesAsync()
+            .then(result => {
+                for(let x in result){
+                    let ipCheck = false;
+                    let urnCheck = false;
 
-                if(ip !== null && devices[x].native.ip === ip){
-                    ipCheck = true;
+                    if(ip !== null && result[x].native.ip === ip){
+                        ipCheck = true;
+                    }
+                    if(urn !== null && result[x].native.urn === urn){
+                        urnCheck = true;
+                    }
+                    if(ipCheck === true || urnCheck === true){
+                        return result[x]._id;
+                    }
                 }
-                if(urn !== null && devices[x].native.urn === urn){
-                    urnCheck = true;
-                }
-                if(ipCheck === true || urnCheck === true){
-                    callback(devices[x]._id);
-                }
+            }, reject =>{
+                console.log(reject);
+            });
 
-            }
-        })
+        return id;
     }
 
 
@@ -837,11 +1343,16 @@ class Onvif extends utils.Adapter {
         let deviceList = await OnvifManager.discovery.startProbe();
 
         for(let x in deviceList){
-            let cameras = await this.getDevicesAsync();
 
-            if(cameras.length === 0){
+            let urn = deviceList[x]['urn'];
+            let serial = urn.split('-');
+            serial = serial.pop();
+
+            let cameras = await this.getDevicesAsync();
+            let check = this.catchNonOnvif(deviceList[x]['types']);
+
                 //if there is no devices can create the new one
-                let first = await this.setObjectNotExistsAsync(deviceList[x]['name'], {
+                 await this.setObjectNotExistsAsync(serial, {
                     type: 'device',
                     common: {
                         name: deviceList[x]['name'],
@@ -860,15 +1371,13 @@ class Onvif extends utils.Adapter {
                         scopes: deviceList[x]['scopes']
                     }
                 });
-                    if(first){
+                    /*if(first){
                     setTimeout(()=>{
                         this.connectToCams();
-                    }, 3000);
-
-                    this.log.info('create test object');
+                    }, 3000);*/
 
 
-                        this.setObject(deviceList[x]['name']  + '.system.reboot', {
+                        this.setObject(serial  + '.system.reboot', {
                             type: 'state',
                             common: {
                                 name: 'Reboot ',
@@ -883,7 +1392,7 @@ class Onvif extends utils.Adapter {
                         });
 
 
-                        this.setObject(deviceList[x]['name']  + '.logs.getlogs', {
+                        this.setObject(serial  + '.logs.getlogs', {
                             type: 'state',
                             common: {
                                 name: 'Get Logs from camera',
@@ -897,7 +1406,7 @@ class Onvif extends utils.Adapter {
                             }
                         });
 
-                        this.setObject(deviceList[x]['name']  + '.logs.systemlog', {
+                        this.setObject(serial  + '.logs.systemlog', {
                             type: 'state',
                             common: {
                                 name: 'System Log ',
@@ -911,7 +1420,7 @@ class Onvif extends utils.Adapter {
                             }
                         });
 
-                        this.setObject(deviceList[x]['name']  + '.logs.accesslog', {
+                        this.setObject(serial + '.logs.accesslog', {
                             type: 'state',
                             common: {
                                 name: 'Access Log ',
@@ -925,220 +1434,8 @@ class Onvif extends utils.Adapter {
                             }
                         });
                 }
-
-            }else{
-                //if there are devices, than check if it is already there
-                this.log.debug('Registered Devices: ' + JSON.stringify(cameras));
-
-                let nr = null;
-                let exists = false;
-
-                for(let z in cameras){
-
-                    if(cameras[z].native.urn === deviceList[x]['urn']){
-                        //check for changes in provided meta data
-                        if(cameras[z].native.ip !== deviceList[x]['address'] || cameras[z].native.service !== deviceList[x]['service'] || cameras[z].native.location !== deviceList[x]['location'] || cameras[z].native.types !== deviceList[x]['types'] || cameras[z].native.scopes !== deviceList[x]['scopes']){
-                            await this.extendObject(cameras[z]._id, {
-                                native: {
-                                    ip: deviceList[x]['address'],
-                                    service: deviceList[x]['service'],
-                                    location: deviceList[x]['location'],
-                                    types: deviceList[x]['types'],
-                                    scopes: deviceList[x]['scopes']
-                                }
-                            })
-                        }
-                        exists = true;
-
-
-                    }else{
-
-                        let n = cameras[z]._id;
-                        n = n.match(/_\d\d\d$/gm);
-                        if(n !== null){
-                            n = n.toString();
-                            n = n.replace(/_/g, '');
-                            n = parseInt(n);
-                            if(n > nr){
-                                nr = n;
-                            }
-                        }
-                    }
-
-
-                }
-                if(nr === null && exists === false){
-                    nr = '001';
-
-                    let next = await this.setObjectNotExistsAsync(deviceList[x]['name'] + '_' + nr, {
-                        type: 'device',
-                        common: {
-                            name: deviceList[x]['name'],
-                            role: 'camera'
-                        },
-                        native: {
-                            user: "",
-                            password: "",
-                            ip: deviceList[x]['address'],
-                            urn: deviceList[x]['urn'],
-                            service: deviceList[x]['service'],
-                            hardware: deviceList[x]['hardware'],
-                            location: deviceList[x]['location'],
-                            types: deviceList[x]['types'],
-                            scopes: deviceList[x]['scopes']
-                        }
-                    });
-
-
-
-                        this.setObject(deviceList[x]['name'] + '_001.system.reboot', {
-                            type: 'state',
-                            common: {
-                                name: 'Reboot ',
-                                type: 'boolean',
-                                role: 'button',
-                                read: false,
-                                write: true
-                            },
-                            native: {}
-                        });
-
-
-                        this.setObject(deviceList[x]['name'] + '_001.logs.getlogs', {
-                            type: 'state',
-                            common: {
-                                name: 'Get Logs from camera',
-                                type: 'boolean',
-                                role: 'button',
-                                read: false,
-                                write: true
-                            },
-                            native: {}
-                        });
-
-                        this.setObject(deviceList[x]['name'] + '_001.logs.systemlog', {
-                            type: 'state',
-                            common: {
-                                name: 'System Log ',
-                                type: 'string',
-                                role: 'text',
-                                read: true,
-                                write: false
-                            },
-                            native: {}
-                        });
-
-                        this.setObject(deviceList[x]['name'] + '_001.logs.accesslog', {
-                            type: 'state',
-                            common: {
-                                name: 'Access Log ',
-                                type: 'string',
-                                role: 'text',
-                                read: true,
-                                write: false
-                            },
-                            native: {}
-                        });
-
-                        setTimeout(() => {
-                            this.connectToCams();
-                        }, 3000);
-
-
-                }else if(exists === false){
-                    this.log.info('Gerät nicht vorhanden');
-                    nr = nr + 1;
-                    nr = nr.toString();
-                    nr = nr.padStart(3, '0');
-
-                    let next = await this.setObjectNotExists(deviceList[x]['name'] + '_' + nr, {
-                        type: 'device',
-                        common: {
-                            name: deviceList[x]['name'],
-                            role: 'camera'
-                        },
-                        native: {
-                            user: "",
-                            password: "",
-                            ip: deviceList[x]['address'],
-                            urn: deviceList[x]['urn'],
-                            service: deviceList[x]['service'],
-                            hardware: deviceList[x]['hardware'],
-                            location: deviceList[x]['location'],
-                            types: deviceList[x]['types'],
-                            scopes: deviceList[x]['scopes']
-                        }
-                    });
-
-                        this.setObject(deviceList[x]['name'] + '_' + nr + '.system.reboot', {
-                            type: 'state',
-                            common: {
-                                name: 'Reboot ',
-                                type: 'boolean',
-                                role: 'button',
-                                read: false,
-                                write: true
-                            },
-                            native: {
-
-                            }
-                        });
-
-
-                        this.setObject(deviceList[x]['name'] + '_' + nr + '.logs.getlogs', {
-                            type: 'state',
-                            common: {
-                                name: 'Get Logs from camera',
-                                type: 'boolean',
-                                role: 'button',
-                                read: false,
-                                write: true
-                            },
-                            native: {
-
-                            }
-                        });
-
-                        this.setObject(deviceList[x]['name'] + '_' + nr + '.logs.systemlog', {
-                            type: 'state',
-                            common: {
-                                name: 'System Log ',
-                                type: 'string',
-                                role: 'text',
-                                read: true,
-                                write: false
-                            },
-                            native: {
-
-                            }
-                        });
-
-                        this.setObject(deviceList[x]['name'] + '_' + nr + '.logs.accesslog', {
-                            type: 'state',
-                            common: {
-                                name: 'Access Log ',
-                                type: 'string',
-                                role: 'text',
-                                read: true,
-                                write: false
-                            },
-                            native: {
-
-                            }
-                        });
-
-                        setTimeout(()=>{
-                            this.connectToCams();
-                        }, 3000);
-
-                }
-
-
-            }
-
         }
 
-    };
 
 
     installFFMPEG(that) {
@@ -1459,6 +1756,24 @@ class Onvif extends utils.Adapter {
                  break;
          }
          this.config.ffmpeg_installed = true;
+    }
+
+    beautifyMsg(message){
+        let statusCode = message.statusCode;
+        let body = message.body;
+        return `Status code: ${statusCode}, ${body}`;
+    }
+
+    catchNonOnvif(types){
+        for(let t in types){
+            let patt = new RegExp('NetworkVideoTransmitter');
+            let res = patt.test(types);
+            if(res === true){
+                return true;
+            }else{
+                return false;
+            }
+        }
     }
 
 
