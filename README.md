@@ -24,6 +24,13 @@ After a while (~30 seconds) all cameras on your network should be found and obje
 
 ## Changelog
 
+### 0.1.2
+* (jey-cee) 2nd try check for NetworkVideoTransmitter
+* (jey-cee) add continuous move for PTZ
+* (jey-cee) add delete Presets
+* (jey-cee) add create new Preset
+* (jey-cee) add update Preset (needs verification from other users)
+
 ### 0.1.1
 * (jey-cee) check for NetworkVideoTransmitter
 * (jey-cee) connect to cams without credentials

@@ -116,8 +116,23 @@ class Onvif extends utils.Adapter {
             let patt = new RegExp('presets');
             let presets = patt.test(id);
             if(presets === true){
-                console.log(id);
-                dp = 'presets';
+                let filter = ['delete', 'update', 'new'];
+                let startPreset = false;
+                for(let f in filter){
+                    let patt = new RegExp(filter[f]);
+                    let check = patt.test(id);
+                    if(check === true){
+                        startPreset = false;
+                        break;
+                    }else{
+                        startPreset = true;
+                    }
+                }
+                if(startPreset === true){
+                    dp = 'presets';
+                }
+
+
             }
 
             switch (dp){
@@ -142,8 +157,20 @@ class Onvif extends utils.Adapter {
                 case 'start_movement':
                     this.startPTZmovement(id);
                     break;
+                case 'continuous_movement':
+                    this.startPTZcontinuous(id);
+                    break;
                 case 'presets':
                     this.gotoPTZPreset(id);
+                    break;
+                case 'delete':
+                    this.deletePTZPreset(id);
+                    break;
+                case 'new':
+                    this.newPTZPreset(id);
+                    break;
+                case 'update':
+                    this.updatePTZPreset(id);
                     break;
             }
         } else {
@@ -265,8 +292,8 @@ class Onvif extends utils.Adapter {
             OnvifManager.connect(address)
                 .then(async results =>{
                     let cam = await this.lookForDev(results.address, null);
-                    results.core.getNetworkInterfaces()
-                        .then(results => {
+                    await results.core.getNetworkInterfaces()
+                        .then(async results => {
                             let name, token, enabled, hwAddress, ip_manual, ip_dhcp, ip_linkLocal, dhcp, ipv4_enabled, ipv6_dhcp, ipv6_enabled, ipv6_ip_dhcp, ipv6_ip_manual, ipv6_ip_link_local, ipv6_router_advert;
                             let ifaces = results.data.GetNetworkInterfacesResponse;
                             for(let i in ifaces){
@@ -520,13 +547,31 @@ class Onvif extends utils.Adapter {
                                 }
 
                             }
-
+                            return true;
                         }, reject => {
                             this.log.error(address + ' get network interfaces:' + JSON.stringify(reject));
+                            return false
                         });
                 }, reject => {
                     this.log.error(address + ' get network interfaces:' + JSON.stringify(reject));
+                    return false;
                 })
+    }
+
+    async getWLANcapabilities(address){
+        OnvifManager.connect(address)
+            .then(async results =>{
+                let cam = await this.lookForDev(results.address, null);
+                results.core.getDot11Capabilities()
+                    .then(results => {
+                        console.log(results.data.GetDot11CapabilitiesResponse);
+
+                    }, reject => {
+                        this.log.error(address + ' get WLAN capabilities:' + JSON.stringify(reject));
+                    });
+            }, reject => {
+                this.log.error(address + ' get WLAN capabilities:' + JSON.stringify(reject));
+            })
     }
 
     async getNetworkProtocols(address){
@@ -626,10 +671,24 @@ class Onvif extends utils.Adapter {
                     .then(async results => {
                         this.log.info(JSON.stringify('get Audio outputs: ' + JSON.stringify(results.data.GetAudioOutputsResponse)));
                     }, reject => {
-                        this.log.error(address + ' get audio outputs:' + JSON.stringify(reject));
+                        this.log.error(address + ' reject get audio outputs:' + JSON.stringify(reject));
                     })
             }, reject => {
                 this.log.error(address + ' get audio outputs:' + JSON.stringify(reject));
+            })
+    }
+
+    async getOSDs(address, cam){
+        OnvifManager.connect(address)
+            .then(async results =>{
+                results.media.getOSDs()
+                    .then(async results => {
+                        this.log.info(JSON.stringify('get OSDs: ' + JSON.stringify(results.data)));
+                    }, reject => {
+                        this.log.error(address + ' reject get OSDs:' + JSON.stringify(reject));
+                    })
+            }, reject => {
+                this.log.error(address + ' get OSDs:' + JSON.stringify(reject));
             })
     }
 
@@ -804,6 +863,33 @@ class Onvif extends utils.Adapter {
                 results.ptz.getPresets( token )
                     .then(results =>{
                         let presets = results.data.GetPresetsResponse.Preset;
+
+                        this.setObjectNotExists(cam + '.ptz.presets.new', {
+                            type: 'state',
+                            common: {
+                                name: 'Create new preset on actual position',
+                                type: 'boolean',
+                                role: 'button',
+                                read: true,
+                                write: true
+                            },
+                            native: {
+                            }
+                        });
+
+                        this.setObjectNotExists(cam + '.ptz.presets.new.name', {
+                            type: 'state',
+                            common: {
+                                name: 'Name for the new preset',
+                                type: 'string',
+                                role: 'text',
+                                read: true,
+                                write: true
+                            },
+                            native: {
+                            }
+                        });
+
                         for(let p in presets){
                             this.setObjectNotExists(cam + '.ptz.presets.' + presets[p]['Name'], {
                                 type: 'state',
@@ -817,6 +903,32 @@ class Onvif extends utils.Adapter {
                                 native: {
                                     xsi_type: presets[p]['$']['xsi:type'],
                                     token: presets[p]['$']['token']
+                                }
+                            });
+
+                            this.setObjectNotExists(cam + '.ptz.presets.' + presets[p]['Name'] + '.delete', {
+                                type: 'state',
+                                common: {
+                                    name: 'Delete preset ' + presets[p]['Name'],
+                                    type: 'boolean',
+                                    role: 'button',
+                                    read: true,
+                                    write: true
+                                },
+                                native: {
+                                }
+                            });
+
+                            this.setObjectNotExists(cam + '.ptz.presets.' + presets[p]['Name'] + '.update', {
+                                type: 'state',
+                                common: {
+                                    name: 'Update preset ' + presets[p]['Name'],
+                                    type: 'boolean',
+                                    role: 'button',
+                                    read: true,
+                                    write: true
+                                },
+                                native: {
                                 }
                             });
                         }
@@ -853,9 +965,107 @@ class Onvif extends utils.Adapter {
 
                 results.ptz.gotoPreset( token, presetToken, speed )
                     .then(results =>{
-                        this.log.info('PTZ goto preset: ' + JSON.stringify(results.data));
+                        if(results.data.GotoPresetResponse !== ''){
+                            this.log.info('PTZ goto preset: ' + JSON.stringify(results.data));
+                        }
                     }, reject =>{
                         this.log.error('PTZ goto preset: ' + JSON.stringify(reject));
+                    });
+
+
+            });
+    }
+
+    async deletePTZPreset(id, profileToken){
+        let dev = id.replace(/\.ptz.*/g, '');
+        let device = await this.getObjectAsync(dev);
+        let address = device.native.ip;
+        OnvifManager.connect(address)
+            .then(async results => {
+                    id = id.replace('.delete', '');
+                    let preset = await this.getObjectAsync(id);
+                    let presetToken = preset.native.token;
+
+
+
+                let token;
+                if (profileToken === null) {
+                    token = results.ptz.defaultProfileToken;
+                } else {
+                    token = profileToken;
+                }
+
+                results.ptz.removePreset( token, presetToken )
+                    .then(results =>{
+                        if(results.data.RemovePresetResponse !== ''){
+                            this.log.info('PTZ delete preset: ' + JSON.stringify(results.data.RemovePresetResponse));
+                        }
+                        this.delObjectAsync(id);
+                        this.delObjectAsync(id + '.delete');
+                        this.delObjectAsync(id + '.update');
+                    }, reject =>{
+                        this.log.error('reject PTZ delete preset: ' + JSON.stringify(reject));
+                    });
+
+
+            });
+    }
+
+    async newPTZPreset(id, profileToken){
+        let dev = id.replace(/\.ptz.*/g, '');
+        let device = await this.getObjectAsync(dev);
+        let address = device.native.ip;
+        OnvifManager.connect(address)
+            .then(async results => {
+                let preset = await this.getStateAsync(id + '.name');
+                let presetToken = preset.val;
+
+                let token;
+                if (profileToken === null) {
+                    token = results.ptz.defaultProfileToken;
+                } else {
+                    token = profileToken;
+                }
+
+                results.ptz.setPreset( token, presetToken, presetToken )
+                    .then(results =>{
+                        if(results.data.RemovePresetResponse !== ''){
+                            this.log.info('PTZ create new preset: ' + JSON.stringify(results.data.RemovePresetResponse));
+                        }
+                        this.getPTZPresets(address);
+                    }, reject =>{
+                        this.log.error('reject PTZ create new preset: ' + JSON.stringify(reject));
+                    });
+
+
+            });
+    }
+
+    async updatePTZPreset(id, profileToken){
+        let dev = id.replace(/\.ptz.*/g, '');
+        let device = await this.getObjectAsync(dev);
+        let address = device.native.ip;
+        OnvifManager.connect(address)
+            .then(async results => {
+                id = id.replace('.update', '');
+                let preset = await this.getObjectAsync(id);
+                let presetToken = preset.native.token;
+                //let name = preset.common.name;
+
+                let token;
+                if (profileToken === null) {
+                    token = results.ptz.defaultProfileToken;
+                } else {
+                    token = profileToken;
+                }
+
+                results.ptz.setPreset( token, presetToken )
+                    .then(results =>{
+                        if(results.data.RemovePresetResponse !== ''){
+                            this.log.info('PTZ update preset: ' + JSON.stringify(results.data.RemovePresetResponse));
+                        }
+                    }, reject =>{
+                        this.log.error('reject PTZ update preset: ' + JSON.stringify(reject));
                     });
 
 
@@ -935,6 +1145,61 @@ class Onvif extends utils.Adapter {
                     this.log.error(object.native.ip + ' PTZ start movment:' + JSON.stringify(reject));
                 })
         }
+
+    }
+
+    async startPTZcontinuous(id){
+        let device = id.replace('.ptz.continuous_movement', '');
+        let x = await this.getStateAsync(device + '.ptz.x');
+        let y = await this.getStateAsync(device + '.ptz.y');
+        let z = await this.getStateAsync(device + '.ptz.z');
+        let speed_x = await this.getStateAsync(device + '.ptz.speed.x');
+        let speed_y = await this.getStateAsync(device + '.ptz.speed.y');
+        let speed_z = await this.getStateAsync(device + '.ptz.speed.z');
+        let object = await this.getObjectAsync(device);
+
+        let speed = {x: speed_x.val, y: speed_y.val, z: speed_z.val};
+
+        let movement = {};
+        if(x.val !== null){
+
+            movement.x = x.val;
+        }else{
+            movement.x = 0;
+        }
+
+        if(y.val !== null){
+            movement.y = y.val;
+        }else{
+            movement.y = 0;
+        }
+
+        if(z.val !== null){
+            movement.z = z.val;
+        }else{
+            movement.z = 0;
+        }
+
+
+            let path = object.native.service.match(/(?<=:\d{2,})\/.*\/.*$/gm);
+
+            OnvifManager.connect(object.native.ip, object.native.port, object.native.user, object.native.password, path)
+                .then(async results =>{
+                    this.log.debug('continuous movment: ' + JSON.stringify(movement));
+                    results.ptz.continuousMove(null, speed, 0)
+                        .then(async results => {
+                            if(results.data.ContinuousMoveResponse !== ''){
+                                this.log.info(object.native.ip + ' PTZ continuous movment: ' + JSON.stringify(results.data));
+                            }
+
+                        }, reject => {
+                            this.log.info(object.native.ip + 'reject PTZ continuous movment: ' + JSON.stringify(reject));
+                        });
+
+
+                }, reject => {
+                    this.log.error(object.native.ip + ' reject PTZ continuous movment:' + JSON.stringify(reject));
+                })
 
     }
 
@@ -1274,18 +1539,34 @@ class Onvif extends utils.Adapter {
                     }
                 });
 
+                this.setObjectNotExists(cam + '.ptz.continuous_movement', {
+                    type: 'state',
+                    common: {
+                        name: 'Continuous movment',
+                        type: 'boolean',
+                        role: 'button',
+                        read: false,
+                        write: true
+                    },
+                    native: {
+
+                    }
+                });
+
 
                 //this.getPTZNodes(list.address);
                 //this.getPTZStatus(list.address);
-                this.getPTZConfigurations(list.address);
-                this.getPTZPresets(list.address, null);
+                await this.getPTZConfigurations(list.address);
+                await this.getPTZPresets(list.address, null);
             }
 
 
             //get additional information
-            this.getNetworkInterfaces(list.address, cam);
-            this.getNetworkProtocols(list.address, cam);
-            this.getAudioOutputs(list.address, cam);
+            await this.getNetworkInterfaces(list.address, cam);
+            await this.getNetworkProtocols(list.address, cam);
+            //await this.getWLANcapabilities(list.address);
+            await this.getAudioOutputs(list.address, cam);
+            //this.getOSDs(list.address, cam);
 
     }
 
@@ -1350,9 +1631,9 @@ class Onvif extends utils.Adapter {
 
             let cameras = await this.getDevicesAsync();
             let check = this.catchNonOnvif(deviceList[x]['types']);
-
+            if(check === true) {
                 //if there is no devices can create the new one
-                 await this.setObjectNotExistsAsync(serial, {
+                await this.setObjectNotExistsAsync(serial, {
                     type: 'device',
                     common: {
                         name: deviceList[x]['name'],
@@ -1371,68 +1652,61 @@ class Onvif extends utils.Adapter {
                         scopes: deviceList[x]['scopes']
                     }
                 });
-                    /*if(first){
-                    setTimeout(()=>{
-                        this.connectToCams();
-                    }, 3000);*/
+                /*if(first){
+                setTimeout(()=>{
+                    this.connectToCams();
+                }, 3000);*/
 
 
-                        this.setObject(serial  + '.system.reboot', {
-                            type: 'state',
-                            common: {
-                                name: 'Reboot ',
-                                type: 'boolean',
-                                role: 'button',
-                                read: false,
-                                write: true
-                            },
-                            native: {
-
-                            }
-                        });
+                this.setObject(serial + '.system.reboot', {
+                    type: 'state',
+                    common: {
+                        name: 'Reboot ',
+                        type: 'boolean',
+                        role: 'button',
+                        read: false,
+                        write: true
+                    },
+                    native: {}
+                });
 
 
-                        this.setObject(serial  + '.logs.getlogs', {
-                            type: 'state',
-                            common: {
-                                name: 'Get Logs from camera',
-                                type: 'boolean',
-                                role: 'button',
-                                read: false,
-                                write: true
-                            },
-                            native: {
+                this.setObject(serial + '.logs.getlogs', {
+                    type: 'state',
+                    common: {
+                        name: 'Get Logs from camera',
+                        type: 'boolean',
+                        role: 'button',
+                        read: false,
+                        write: true
+                    },
+                    native: {}
+                });
 
-                            }
-                        });
+                this.setObject(serial + '.logs.systemlog', {
+                    type: 'state',
+                    common: {
+                        name: 'System Log ',
+                        type: 'string',
+                        role: 'text',
+                        read: true,
+                        write: false
+                    },
+                    native: {}
+                });
 
-                        this.setObject(serial  + '.logs.systemlog', {
-                            type: 'state',
-                            common: {
-                                name: 'System Log ',
-                                type: 'string',
-                                role: 'text',
-                                read: true,
-                                write: false
-                            },
-                            native: {
-
-                            }
-                        });
-
-                        this.setObject(serial + '.logs.accesslog', {
-                            type: 'state',
-                            common: {
-                                name: 'Access Log ',
-                                type: 'string',
-                                role: 'text',
-                                read: true,
-                                write: false
-                            },
-                            native: {
-
-                            }
-                        });
+                this.setObject(serial + '.logs.accesslog', {
+                    type: 'state',
+                    common: {
+                        name: 'Access Log ',
+                        type: 'string',
+                        role: 'text',
+                        read: true,
+                        write: false
+                    },
+                    native: {}
+                });
+            }
                 }
         }
 
