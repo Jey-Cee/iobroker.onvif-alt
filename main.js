@@ -13,11 +13,6 @@ const OS = require('os');
 const https = require('https');
 const fs = require('fs');
 const exec = require('child_process').exec;
-const rtsp = require('./lib/videoStream.js');
-
-// Load your modules here, e.g.:
-// const fs = require("fs");
-
 
 
 class Onvif extends utils.Adapter {
@@ -45,28 +40,14 @@ class Onvif extends utils.Adapter {
     async onReady() {
 
         /*
-        if(this.config.ffmpeg_installed === false){
-            this.log.info('Checking for ffmpeg');
-            fs.access(`${__dirname}/lib/ffmpeg`, fs.constants.F_OK, (err) => {
-                //this.log.debug(`${__dirname}/lib/ffmpeg ${err ? 'does not exist' : 'exists'}`);
-                if(err){
-                    this.log.info('ffmpeg is not isnstalled, will install it now');
-                    this.installFFMPEG(this);
-                }else{
-                    this.log.info('ffmpeg is already there');
-                    this.config.ffmpeg_installed = true;
-                }
+        await this.autoDiscover()
+            .then( results => {
+                this.log.info('Discovery ready');
+                this.connectToCams();
             });
-
-        }
         */
 
-
-        this.autoDiscover();
-
         this.connectToCams();
-
-        //this.convert_stream();
 
         // in this template all states changes inside the adapters namespace are subscribed
         this.subscribeStates('*');
@@ -212,23 +193,13 @@ class Onvif extends utils.Adapter {
                 }
 
             }
+
+     		if(obj.command === 'addDevice') {
+     		    this.addManualCam(obj.message.ip, obj.message.port, obj.message.user, obj.password.password);
+            }
      	}
     }
 
-    //rtsp stream test
-    convert_stream(){
-         let stream = new rtsp({
-             //name: 'test',
-             streamURL: 'rtsp://192.168.0.82:554/videoMain',
-             host: '0.0.0.0',
-             wsPort: 9999,
-             wsPath: '/video.mp4',
-             ffmpegOptions: {
-                 '-stats': '',
-                 '-r': 30
-             }
-         })
-    }
 
     rebootCamera(id){
          let cam_id = id.replace('.system.reboot', '');
@@ -561,7 +532,6 @@ class Onvif extends utils.Adapter {
     async getWLANcapabilities(address){
         OnvifManager.connect(address)
             .then(async results =>{
-                let cam = await this.lookForDev(results.address, null);
                 results.core.getDot11Capabilities()
                     .then(results => {
                         console.log(results.data.GetDot11CapabilitiesResponse);
@@ -571,6 +541,20 @@ class Onvif extends utils.Adapter {
                     });
             }, reject => {
                 this.log.error(address + ' get WLAN capabilities:' + JSON.stringify(reject));
+            })
+    }
+
+    async getEventProperties(address){
+        OnvifManager.connect(address)
+            .then(async results =>{
+                results.events.getServiceCapabilities()
+                    .then(results => {
+                        console.log(results.data);
+                    }, reject => {
+                        this.log.error(address + ' get Event Properties:' + JSON.stringify(reject));
+                    });
+            }, reject => {
+                this.log.error(address + ' get Event Properties:' + JSON.stringify(reject));
             })
     }
 
@@ -1219,6 +1203,20 @@ class Onvif extends utils.Adapter {
 
     }
 
+    async addManualCam(ip, port, user, password){
+        await OnvifManager.connect(ip, port, user, password)
+            .then(results => {
+                this.log.info('results: ' + JSON.stringify(results));
+                let camera = results;
+                let c = this.createStatesByServices(camera);
+                let d = this.updateMainInfo(camera);
+
+            }, reject => {
+                //this.log.error('Connect to cams:' + JSON.stringify(reject));
+                this.log.error('Connect to cam:' + ip + ' ' + JSON.stringify(reject));
+            })
+    }
+
     async connectToCams(){
         this.log.info('connecting');
 
@@ -1239,6 +1237,7 @@ class Onvif extends utils.Adapter {
                         let camera = results;
                         let c = this.createStatesByServices(camera);
                         let d = this.updateMainInfo(camera);
+
                         }, reject => {
                             //this.log.error('Connect to cams:' + JSON.stringify(reject));
                             this.log.error('Connect to cams:' + ip + ' ' + JSON.stringify(reject));
@@ -1565,6 +1564,7 @@ class Onvif extends utils.Adapter {
             await this.getNetworkInterfaces(list.address, cam);
             await this.getNetworkProtocols(list.address, cam);
             //await this.getWLANcapabilities(list.address);
+            await this.getEventProperties(list.address);
             await this.getAudioOutputs(list.address, cam);
             //this.getOSDs(list.address, cam);
 
@@ -1707,330 +1707,10 @@ class Onvif extends utils.Adapter {
                     native: {}
                 });
             }
-                }
         }
+        return true;
+     }
 
-
-
-    installFFMPEG(that) {
-         let arch = OS.arch();
-         let platform = OS.platform();
-         let release = OS.release();
-         let type = OS.type();
-
-         //download links
-        const linux_amd64 = 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz';
-        const linux_i686 = 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-i686-static.tar.xz';
-        const linux_arm64 = 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz';
-        const linux_armhf = 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-armhf-static.tar.xz';
-        const win_64 = 'https://ffmpeg.zeranoe.com/builds/win64/static/ffmpeg-20190608-b6ca032-win64-static.zip';
-        const win_32 = 'https://ffmpeg.zeranoe.com/builds/win32/static/ffmpeg-20190608-b6ca032-win32-static.zip';
-        const macos_64 = 'https://ffmpeg.zeranoe.com/builds/macos64/static/ffmpeg-20190608-b6ca032-macos64-static.zip';
-
-         that.log.debug('Arch: ' + arch + '\n Platform: ' + platform + '\n Release: ' + release + '\n Type: ' + type);
-
-        arch = arch.toString();
-
-        let pkg;
-        let unzip;
-        let request;
-
-
-         switch(platform.toString()){
-             case 'linux':
-                 switch(arch){
-                     case 'x64':
-                         pkg = fs.createWriteStream(__dirname + "/lib/ffmpeg.tar.xz");
-                         request = https.get(linux_amd64, (response)=>{
-                             response.pipe(pkg);
-                         });
-                         pkg.on('finish', ()=>{
-                            exec(`tar -xf ${__dirname}/lib/ffmpeg.tar.xz -C ${__dirname}/lib/`, (err, stdout, stderr)=>{
-                                if(err){
-                                    this.log.error('Error: ' + err);
-                                }else{
-                                    this.log.error('Stderr: ' + stderr);
-                                    this.log.debug('Stdout: ' + stdout);
-                                    //remove tar.xz
-                                    exec(`rm ${__dirname}/lib/ffmpeg.tar.xz`, ()=>{
-                                        fs.readdir(`${__dirname}/lib`, (err, files)=>{
-                                            for(let x in files){
-                                                let patt = new RegExp(/ffmpeg.*static/g);
-                                                let test = patt.test(files[x]);
-
-                                                if(test === true){
-                                                    //rename extracted folder to generic 'ffmpeg'
-                                                    fs.rename(`${__dirname}/lib/${files[x]}`, `${__dirname}/lib/ffmpeg`, (err)=>{
-                                                        if(err){
-                                                            this.log.error(err);
-                                                        }
-                                                        //create symlink to executable of ffmpeg
-                                                        fs.symlink(`${__dirname}/lib/ffmpeg/ffmpeg`, `${__dirname}/lib/ffmpeg_bin`, (err)=>{
-                                                            if(err){
-                                                                this.log.error(err);
-                                                            }
-                                                        });
-                                                    })
-                                                }
-                                            }
-                                        })
-                                    });
-
-                                }
-
-                            })
-                         });
-
-                         break;
-                     case 'x32':
-                         pkg = fs.createWriteStream("lib/ffmpeg.tar.xz");
-                         request = https.get(linux_i686, (response)=>{
-                             response.pipe(pkg);
-                         });
-
-                         pkg.on('finish', ()=>{
-                             exec(`tar -xf ${__dirname}/lib/ffmpeg.tar.xz -C ${__dirname}/lib/`, (err, stdout, stderr)=>{
-                                 if(err){
-                                     this.log.error('Error: ' + err);
-                                 }else{
-                                     this.log.error('Stderr: ' + stderr);
-                                     this.log.debug('Stdout: ' + stdout);
-                                     //remove tar.xz
-                                     exec(`rm ${__dirname}/lib/ffmpeg.tar.xz`, ()=>{
-                                         fs.readdir(`${__dirname}/lib`, (err, files)=>{
-                                             for(let x in files){
-                                                 let patt = new RegExp(/ffmpeg.*static/g);
-                                                 let test = patt.test(files[x]);
-
-                                                 if(test === true){
-                                                     //rename extracted folder to generic 'ffmpeg'
-                                                     fs.rename(`${__dirname}/lib/${files[x]}`, `${__dirname}/lib/ffmpeg`, (err)=>{
-                                                         if(err){
-                                                             this.log.error(err);
-                                                         }
-                                                         //create symlink to executable of ffmpeg
-                                                         fs.symlink(`${__dirname}/lib/ffmpeg/ffmpeg`, `${__dirname}/lib/ffmpeg_bin`, (err)=>{
-                                                             if(err){
-                                                                 this.log.error(err);
-                                                             }
-                                                         });
-                                                     })
-                                                 }
-                                             }
-                                         })
-                                     });
-
-                                 }
-
-                             })
-                         });
-                         break;
-                     case 'arm':
-                         pkg = fs.createWriteStream("lib/ffmpeg.tar.xz");
-                         request = https.get(linux_armhf, (response)=>{
-                             response.pipe(pkg);
-                         });
-
-                         pkg.on('finish', ()=>{
-                             exec(`tar -xf ${__dirname}/lib/ffmpeg.tar.xz -C ${__dirname}/lib/`, (err, stdout, stderr)=>{
-                                 if(err){
-                                     this.log.error('Error: ' + err);
-                                 }else{
-                                     this.log.error('Stderr: ' + stderr);
-                                     this.log.debug('Stdout: ' + stdout);
-                                     //remove tar.xz
-                                     exec(`rm ${__dirname}/lib/ffmpeg.tar.xz`, ()=>{
-                                         fs.readdir(`${__dirname}/lib`, (err, files)=>{
-                                             for(let x in files){
-                                                 let patt = new RegExp(/ffmpeg.*static/g);
-                                                 let test = patt.test(files[x]);
-
-                                                 if(test === true){
-                                                     //rename extracted folder to generic 'ffmpeg'
-                                                     fs.rename(`${__dirname}/lib/${files[x]}`, `${__dirname}/lib/ffmpeg`, (err)=>{
-                                                         if(err){
-                                                             this.log.error(err);
-                                                         }
-                                                         //create symlink to executable of ffmpeg
-                                                         fs.symlink(`${__dirname}/lib/ffmpeg/ffmpeg`, `${__dirname}/lib/ffmpeg_bin`, (err)=>{
-                                                             if(err){
-                                                                 this.log.error(err);
-                                                             }
-                                                         });
-                                                     })
-                                                 }
-                                             }
-                                         })
-                                     });
-
-                                 }
-
-                             })
-                         });
-                         break;
-                     case 'arm64':
-                         pkg = fs.createWriteStream("lib/ffmpeg.tar.xz");
-                         request = https.get(linux_arm64, (response)=>{
-                             response.pipe(pkg);
-                         });
-
-                         pkg.on('finish', ()=>{
-                             exec(`tar -xf ${__dirname}/lib/ffmpeg.tar.xz -C ${__dirname}/lib/`, (err, stdout, stderr)=>{
-                                 if(err){
-                                     this.log.error('Error: ' + err);
-                                 }else{
-                                     this.log.error('Stderr: ' + stderr);
-                                     this.log.debug('Stdout: ' + stdout);
-                                     //remove tar.xz
-                                     exec(`rm ${__dirname}/lib/ffmpeg.tar.xz`, ()=>{
-                                         fs.readdir(`${__dirname}/lib`, (err, files)=>{
-                                             for(let x in files){
-                                                 let patt = new RegExp(/ffmpeg.*static/g);
-                                                 let test = patt.test(files[x]);
-
-                                                 if(test === true){
-                                                     //rename extracted folder to generic 'ffmpeg'
-                                                     fs.rename(`${__dirname}/lib/${files[x]}`, `${__dirname}/lib/ffmpeg`, (err)=>{
-                                                         if(err){
-                                                             this.log.error(err);
-                                                         }
-                                                         //create symlink to executable of ffmpeg
-                                                         fs.symlink(`${__dirname}/lib/ffmpeg/ffmpeg`, `${__dirname}/lib/ffmpeg_bin`, (err)=>{
-                                                             if(err){
-                                                                 this.log.error(err);
-                                                             }
-                                                         });
-                                                     })
-                                                 }
-                                             }
-                                         })
-                                     });
-
-                                 }
-
-                             })
-                         });
-                         break;
-                 }
-                 break;
-             case 'win32':
-                 switch(arch){
-                     case 'x64':
-                         pkg = fs.createWriteStream("lib/ffmpeg.zip");
-                         request = https.get(win_64, (response)=>{
-                             response.pipe(pkg);
-                         });
-
-                         pkg.on('finish', ()=>{
-                             unzip = fs.createReadStream(`${__dirname}/lib/ffmpeg.zip`)
-                                 .pipe(unzipper.Extract({ path: `${__dirname}/lib/` }))
-                                 .on('finish', ()=>{
-                                     //remove tar.xz
-                                     exec(`rm ${__dirname}/lib/ffmpeg.tar.xz`, ()=>{
-                                         fs.readdir(`${__dirname}/lib`, (err, files)=>{
-                                             for(let x in files){
-                                                 let patt = new RegExp(/ffmpeg.*static/g);
-                                                 let test = patt.test(files[x]);
-
-                                                 if(test === true){
-                                                     //rename extracted folder to generic 'ffmpeg'
-                                                     fs.rename(`${__dirname}/lib/${files[x]}`, `${__dirname}/lib/ffmpeg`, (err)=>{
-                                                         if(err){
-                                                             this.log.error(err);
-                                                         }
-                                                         //create symlink to executable of ffmpeg
-                                                         fs.symlink(`${__dirname}/lib/ffmpeg/bin/ffmpeg.exe`, `${__dirname}/lib/ffmpeg_bin`, (err)=>{
-                                                             if(err){
-                                                                 this.log.error(err);
-                                                             }
-                                                         });
-                                                     })
-                                                 }
-                                             }
-                                         })
-                                     });
-                                 });
-                         });
-                         break;
-                     case 'x32':
-                         pkg = fs.createWriteStream("lib/ffmpeg.zip");
-                         request = https.get(win_32, (response)=>{
-                             response.pipe(pkg);
-                         });
-
-                         pkg.on('finish', ()=>{
-                             unzip = fs.createReadStream(`${__dirname}/lib/ffmpeg.zip`)
-                                 .pipe(unzipper.Extract({ path: `${__dirname}/lib/` }))
-                                 .on('finish', ()=>{
-                                     //remove tar.xz
-                                     exec(`rm ${__dirname}/lib/ffmpeg.tar.xz`, ()=>{
-                                         fs.readdir(`${__dirname}/lib`, (err, files)=>{
-                                             for(let x in files){
-                                                 let patt = new RegExp(/ffmpeg.*static/g);
-                                                 let test = patt.test(files[x]);
-
-                                                 if(test === true){
-                                                     //rename extracted folder to generic 'ffmpeg'
-                                                     fs.rename(`${__dirname}/lib/${files[x]}`, `${__dirname}/lib/ffmpeg`, (err)=>{
-                                                         if(err){
-                                                             this.log.error(err);
-                                                         }
-                                                         //create symlink to executable of ffmpeg
-                                                         fs.symlink(`${__dirname}/lib/ffmpeg/bin/ffmpeg.exe`, `${__dirname}/lib/ffmpeg_bin`, (err)=>{
-                                                             if(err){
-                                                                 this.log.error(err);
-                                                             }
-                                                         });
-                                                     })
-                                                 }
-                                             }
-                                         })
-                                     });
-                                 });
-                         });
-                         break;
-                 }
-                 break;
-             case 'darwin':
-                 pkg = fs.createWriteStream("lib/ffmpeg.zip");
-                 request = https.get(macos_64, (response)=>{
-                     response.pipe(pkg);
-                 });
-
-                 pkg.on('finish', ()=>{
-                     unzip = fs.createReadStream(`${__dirname}/lib/ffmpeg.zip`)
-                         .pipe(unzipper.Extract({ path: `${__dirname}/lib/` }))
-                         .on('finish', ()=>{
-                             //remove tar.xz
-                             exec(`rm ${__dirname}/lib/ffmpeg.tar.xz`, ()=>{
-                                 fs.readdir(`${__dirname}/lib`, (err, files)=>{
-                                     for(let x in files){
-                                         let patt = new RegExp(/ffmpeg.*static/g);
-                                         let test = patt.test(files[x]);
-
-                                         if(test === true){
-                                             //rename extracted folder to generic 'ffmpeg'
-                                             fs.rename(`${__dirname}/lib/${files[x]}`, `${__dirname}/lib/ffmpeg`, (err)=>{
-                                                 if(err){
-                                                     this.log.error(err);
-                                                 }
-                                                 //create symlink to executable of ffmpeg
-                                                 fs.symlink(`${__dirname}/lib/ffmpeg/bin/ffmpeg`, `${__dirname}/lib/ffmpeg_bin`, (err)=>{
-                                                     if(err){
-                                                         this.log.error(err);
-                                                     }
-                                                 });
-                                             })
-                                         }
-                                     }
-                                 })
-                             });
-                         });
-                 });
-                 break;
-         }
-         this.config.ffmpeg_installed = true;
-    }
 
     beautifyMsg(message){
         let statusCode = message.statusCode;

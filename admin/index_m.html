@@ -18,6 +18,12 @@
     <script type="text/javascript" src="words.js"></script>
 
     <script type="text/javascript">
+
+
+        $(document).ready(function(){
+            $('.modal').modal();
+        });
+
         // This will be called by the admin adapter when the settings page loads
         let onChangeG;
         function showDevice(obj) {
@@ -130,15 +136,53 @@
 <body>
 
     <div class="m adapter-container">
+        <!-- TODO: take camera data from modal to backend for connection-->
+        <!-- Modal Structure -->
+        <div id="add-device" class="modal">
+            <div class="modal-content">
+                <h4 class="blue lighten-3 translate" style="width:100%;">Add new camera</h4>
+                <div class="row">
+                    <div class="input-field col s6">
+                        <input placeholder="192.168.0.1" type="text" id="new-ip" value="" class="validate">
+                        <label for="new-ip" class="translate">IP</label>
+                    </div>
+                    <div class="input-field col s6">
+                        <input placeholder="888" class="value" id="new-port" type="text" ></input>
+                        <label for="new-port" class="translate">Port</label>
+                    </div>
+                    <div class="input-field col s6">
+                        <input placeholder="" class="value" id="new-user" type="text" ></input>
+                        <label for="new-user" class="translate">User</label>
+                    </div>
+                    <div class="input-field col s6">
+                        <input placeholder="" class="value" id="new-password" type="text" ></input>
+                        <label for="new-password" class="translate">Password</label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn waves-effect waves-light modal-close modal-action translate" type="submit" name="action" id="addCameraSubmit">add camera
+                    <i class="material-icons right">send</i>
+                </button>
+                <button class="btn waves-effect waves-light modal-close modal-action translate" href="#!">close</button>
+            </div>
+        </div>
 
         <div class="row">
-            <div class="col s12 m4 l2">
+            <div class="col s2 m4 l2">
                 <img src="onvif.png" class="logo">
             </div>
         </div>
 
-        <!-- List of devices -->
+        <div class="row">
+            <div class="input-field col s2">
+                <a data-operation="addDevice" data-icon="add" class="waves-effect waves-light btn modal-trigger translate" href="#add-device">Add camera</a>
+            </div>
+        </div>
 
+
+
+        <!-- List of devices -->
         <div class="table-values-div">
             <table class="centered highlight">
                 <thead>
