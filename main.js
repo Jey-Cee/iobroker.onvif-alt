@@ -15,7 +15,7 @@ const fs = require('fs');
 const exec = require('child_process').exec;
 
 
-class Onvif extends utils.Adapter {
+class Onvif_alt extends utils.Adapter {
 
     /**
      * @param {Partial<ioBroker.AdapterOptions>} [options={}]
@@ -23,7 +23,7 @@ class Onvif extends utils.Adapter {
     constructor(options) {
         super({
             ...options,
-            name: 'onvif',
+            name: 'onvif-alt',
         });
         this.on('ready', this.onReady.bind(this));
         this.on('objectChange', this.onObjectChange.bind(this));
