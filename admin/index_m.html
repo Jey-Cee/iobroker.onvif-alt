@@ -22,6 +22,18 @@
 
         $(document).ready(function(){
             $('.modal').modal();
+
+            $('#addCameraSubmit').on('click', function(){
+                let msg = {};
+                msg.ip = $('#new-ip').val();
+                msg.port = $('#new-port').val();
+                msg.user = $('#new-user').val();
+                msg.password = $('#new-password').val();
+
+                sendTo(null, 'addDevice', msg);
+            });
+
+
         });
 
         // This will be called by the admin adapter when the settings page loads
@@ -39,9 +51,10 @@
             M.updateTextFields();
 
             //$('#devices > tr').eq(countRows).find('td').eq(0).find('input').val(name)
-            $('input')
+            $('.table-values-div > table > tbody > tr > td > input')
                 .on('change', () => onChangeG())
                 .on('keyup', () => onChangeG());
+
         }
 
         function emitDevices(){
@@ -76,8 +89,7 @@
                     // do not call onChange direct, because onChange could expect some arguments
                     $key.val(settings[id])
                         .on('change', () => onChange())
-                        .on('keyup', () => onChange())
-                        ;
+                        .on('keyup', () => onChange());
                 }
             });
             emitDevices();
@@ -89,6 +101,7 @@
         // This will be called by the admin adapter when the user presses the save button
         function save(callback) {
             // example: select elements with class=value and build settings object
+
             let obj = {};
             $('.value').each(function () {
                 let $this = $(this);
@@ -99,6 +112,7 @@
                 }
             });
             callback(obj);
+
 
             let updateList ={};
             $('#devices > tr').each((i, e)=>{
@@ -129,6 +143,8 @@
 
             sendTo(null, 'updateDevice', updateList);
         }
+
+
     </script>
 
 </head>
@@ -136,7 +152,6 @@
 <body>
 
     <div class="m adapter-container">
-        <!-- TODO: take camera data from modal to backend for connection-->
         <!-- Modal Structure -->
         <div id="add-device" class="modal">
             <div class="modal-content">
@@ -147,15 +162,15 @@
                         <label for="new-ip" class="translate">IP</label>
                     </div>
                     <div class="input-field col s6">
-                        <input placeholder="888" class="value" id="new-port" type="text" ></input>
+                        <input placeholder="888" class="validate" id="new-port" type="number" ></input>
                         <label for="new-port" class="translate">Port</label>
                     </div>
                     <div class="input-field col s6">
-                        <input placeholder="" class="value" id="new-user" type="text" ></input>
+                        <input placeholder="" class="validate" id="new-user" type="text" ></input>
                         <label for="new-user" class="translate">User</label>
                     </div>
                     <div class="input-field col s6">
-                        <input placeholder="" class="value" id="new-password" type="text" ></input>
+                        <input placeholder="" class="validate" id="new-password" type="password" ></input>
                         <label for="new-password" class="translate">Password</label>
                     </div>
                 </div>

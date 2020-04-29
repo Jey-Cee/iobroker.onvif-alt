@@ -1,12 +1,12 @@
 {
-    "name": "iobroker.onvif",
-    "version": "0.1.2",
+    "name": "iobroker.onvif-alt",
+    "version": "0.2.0",
     "description": "Discover and control onvif ready devices.",
     "author": {
         "name": "Jey Cee",
         "email": "jey-cee@live.com"
     },
-    "homepage": "https://github.com/Jey-Cee/ioBroker.onvif",
+    "homepage": "https://github.com/Jey-Cee/ioBroker.onvif-alt",
     "license": "MIT",
     "keywords": [
         "onvif",
@@ -16,7 +16,7 @@
     ],
     "repository": {
         "type": "git",
-        "url": "https://github.com/Jey-Cee/ioBroker.onvif.git"
+        "url": "https://github.com/Jey-Cee/ioBroker.onvif-alt.git"
     },
     "dependencies": {
         "onvif-nvt": "^0.2.20",
@@ -47,7 +47,7 @@
         "gulp": "gulp"
     },
     "bugs": {
-        "url": "https://github.com/Jey-Cee/ioBroker.onvif/issues"
+        "url": "https://github.com/Jey-Cee/ioBroker.onvif-alt/issues"
     },
     "readmeFilename": "README.md"
 }

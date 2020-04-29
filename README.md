@@ -1,14 +1,14 @@
 ![Logo](admin/onvif.png)
-# ioBroker.onvif
+# ioBroker.onvif-alt
 
-[![NPM version](http://img.shields.io/npm/v/iobroker.onvif.svg)](https://www.npmjs.com/package/iobroker.onvif)
-[![Downloads](https://img.shields.io/npm/dm/iobroker.onvif.svg)](https://www.npmjs.com/package/iobroker.onvif)
-[![Dependency Status](https://img.shields.io/david/jey-cee/iobroker.onvif.svg)](https://david-dm.org/Author/iobroker.onvif)
-[![Known Vulnerabilities](https://snyk.io/test/github/jey-cee/ioBroker.onvif/badge.svg)](https://snyk.io/test/github/jey-cee/ioBroker.onvif)
+[![NPM version](http://img.shields.io/npm/v/iobroker.onvif-alt.svg)](https://www.npmjs.com/package/iobroker.onvif-alt)
+[![Downloads](https://img.shields.io/npm/dm/iobroker.onvif-alt.svg)](https://www.npmjs.com/package/iobroker.onvif-alt)
+[![Dependency Status](https://img.shields.io/david/jey-cee/iobroker.onvif-alt.svg)](https://david-dm.org/jey-cee/iobroker.onvif-alt)
+[![Known Vulnerabilities](https://snyk.io/test/github/jey-cee/ioBroker.onvif-alt/badge.svg)](https://snyk.io/test/github/jey-cee/ioBroker.onvif-alt)
 
-[![NPM](https://nodei.co/npm/iobroker.onvif.png?downloads=true)](https://nodei.co/npm/iobroker.onvif/)
+[![NPM](https://nodei.co/npm/iobroker.onvif-alt.png?downloads=true)](https://nodei.co/npm/iobroker.onvif-alt/)
 
-**Tests:**: [![Travis-CI](http://img.shields.io/travis/jey-cee/ioBroker.onvif/master.svg)](https://travis-ci.org/jey-cee/ioBroker.onvif)
+**Tests:**: [![Travis-CI](http://img.shields.io/travis/jey-cee/ioBroker.onvif-alt/master.svg)](https://travis-ci.org/jey-cee/ioBroker.onvif-alt)
 
 ## Onvif - IP camera protocol
 
@@ -23,6 +23,12 @@ After a while (~30 seconds) all cameras on your network should be found and obje
 
 
 ## Changelog
+
+### 0.2.0
+* rename adapter
+
+### 0.1.3
+* (jey-cee) add cameras manual
 
 ### 0.1.2
 * (jey-cee) 2nd try check for NetworkVideoTransmitter

@@ -39,15 +39,13 @@ class Onvif extends utils.Adapter {
      */
     async onReady() {
 
-        /*
         await this.autoDiscover()
             .then( results => {
                 this.log.info('Discovery ready');
                 this.connectToCams();
             });
-        */
 
-        this.connectToCams();
+        //this.connectToCams();
 
         // in this template all states changes inside the adapters namespace are subscribed
         this.subscribeStates('*');
@@ -131,6 +129,7 @@ class Onvif extends utils.Adapter {
                     break;
                 case 'discover':
                     this.autoDiscover();
+                    this.setState('discover', {val: false, ack: true});
                     break;
                 case 'stop_movement':
                     this.stopMovement(id);
@@ -195,7 +194,8 @@ class Onvif extends utils.Adapter {
             }
 
      		if(obj.command === 'addDevice') {
-     		    this.addManualCam(obj.message.ip, obj.message.port, obj.message.user, obj.password.password);
+     		    this.log.info('Manual add ' + JSON.stringify(obj.message));
+     		    this.addManualCam(obj.message.ip, obj.message.port, obj.message.user, obj.message.password);
             }
      	}
     }
@@ -735,8 +735,10 @@ class Onvif extends utils.Adapter {
                                 name = confs['PTZConfiguration']['Name'];
                                 useCount = confs['PTZConfiguration']['UseCount'];
                                 nodeToken = confs['PTZConfiguration']['NodeToken'];
-                                PTZspeedX = confs['PTZConfiguration']['DefaultPTZSpeed']['PanTilt']['$']['x'];
-                                PTZspeedY = confs['PTZConfiguration']['DefaultPTZSpeed']['PanTilt']['$']['y'];
+                                if(confs['PTZConfiguration']['DefaultPTZSpeed']){
+                                    PTZspeedX = confs['PTZConfiguration']['DefaultPTZSpeed']['PanTilt']['$']['x'];
+                                    PTZspeedY = confs['PTZConfiguration']['DefaultPTZSpeed']['PanTilt']['$']['y'];
+                                }
                                 PTZTimeout = confs['PTZConfiguration']['DefaultPTZTimeout'];
 
                                 //TODO: write information to an object, which one?
@@ -1204,12 +1206,30 @@ class Onvif extends utils.Adapter {
     }
 
     async addManualCam(ip, port, user, password){
+
         await OnvifManager.connect(ip, port, user, password)
-            .then(results => {
-                this.log.info('results: ' + JSON.stringify(results));
+            .then(async results => {
                 let camera = results;
-                let c = this.createStatesByServices(camera);
-                let d = this.updateMainInfo(camera);
+
+                await this.setObjectAsync( camera.deviceInformation.SerialNumber, {
+                    type: 'device',
+                    common: {
+                        name: camera.deviceInformation.Name,
+                        role: 'camera'
+                    },
+                    native: {
+                        ip: camera.address,
+                        port: port,
+                        user: user,
+                        password: password,
+                        service: camera.core.serviceAddress.href
+                    }
+                });
+
+                let c = await this.createStatesByServices(camera);
+                let d = await this.updateMainInfo(camera);
+
+                this.createStandardObj(camera.deviceInformation.SerialNumber);
 
             }, reject => {
                 //this.log.error('Connect to cams:' + JSON.stringify(reject));
@@ -1218,11 +1238,10 @@ class Onvif extends utils.Adapter {
     }
 
     async connectToCams(){
-        this.log.info('connecting');
 
         let devices = await this.getDevicesAsync();
 
-        this.log.info('devices for connection: ' + JSON.stringify(devices));
+        this.log.debug('devices for connection: ' + JSON.stringify(devices));
         for(let x in devices){
             let ip, port, path;
 
@@ -1230,7 +1249,6 @@ class Onvif extends utils.Adapter {
                 ip = devices[x].native.ip;
                 port = devices[x].native.service.match(/(?<=:)\d{2,}/gm);
                 path = devices[x].native.service.match(/(?<=:\d{2,})\/.*\/.*$/gm);
-
                 await OnvifManager.connect(ip, port, devices[x].native.user, devices[x].native.password, path)
                     .then(results => {
                         this.log.info('results: ' + JSON.stringify(results));
@@ -1254,6 +1272,9 @@ class Onvif extends utils.Adapter {
                         let camera = results;
                         let c = this.createStatesByServices(camera);
                         let d = this.updateMainInfo(camera);
+
+                        //new this.receiveEvents(ip, port, path);
+
                     }, reject => {
                         //this.log.error('Connect to cams:' + JSON.stringify(reject));
                         this.log.error('Connect to cams:' + ip + ' ' + JSON.stringify(reject));
@@ -1262,8 +1283,30 @@ class Onvif extends utils.Adapter {
         }
     }
 
+    receiveEvents(ip, port, path){
+         this.log.info('Event receiver');
+        OnvifManager.connect(ip,port, path)
+            .then(results => {
+                let camera = results;
+
+                camera.events.on('messages', messages => {
+                    console.log('Messages Received:', messages)
+                });
+
+                camera.events.on('messages:error', error => {
+                    console.error('Messages Error:', error)
+                });
+
+                camera.events.startPull()
+            }, reject => {
+                //this.log.error('Connect to cams:' + JSON.stringify(reject));
+                this.log.error('Connect to cam:' + ip + ' ' + JSON.stringify(reject));
+            })
+    }
+
     async createStatesByServices(list){
          //extend device object with additional information
+
         let id = await this.lookForDev(list.address, null);
             let cam = id.replace(/onvif.\d./g, '');
             //create objects for each profile
@@ -1576,7 +1619,7 @@ class Onvif extends utils.Adapter {
 
                 this.extendObject(id, {
                     native: {
-                        port: list.port[0],
+                        port: list.port,
                         manufacturer: dInfo.Manufacturer,
                         model: dInfo.Model,
                         firmware: dInfo.FirmwareVersion,
@@ -1657,59 +1700,63 @@ class Onvif extends utils.Adapter {
                     this.connectToCams();
                 }, 3000);*/
 
+                this.createStandardObj(serial);
 
-                this.setObject(serial + '.system.reboot', {
-                    type: 'state',
-                    common: {
-                        name: 'Reboot ',
-                        type: 'boolean',
-                        role: 'button',
-                        read: false,
-                        write: true
-                    },
-                    native: {}
-                });
-
-
-                this.setObject(serial + '.logs.getlogs', {
-                    type: 'state',
-                    common: {
-                        name: 'Get Logs from camera',
-                        type: 'boolean',
-                        role: 'button',
-                        read: false,
-                        write: true
-                    },
-                    native: {}
-                });
-
-                this.setObject(serial + '.logs.systemlog', {
-                    type: 'state',
-                    common: {
-                        name: 'System Log ',
-                        type: 'string',
-                        role: 'text',
-                        read: true,
-                        write: false
-                    },
-                    native: {}
-                });
-
-                this.setObject(serial + '.logs.accesslog', {
-                    type: 'state',
-                    common: {
-                        name: 'Access Log ',
-                        type: 'string',
-                        role: 'text',
-                        read: true,
-                        write: false
-                    },
-                    native: {}
-                });
             }
         }
         return true;
      }
+
+     async createStandardObj(serial){
+         this.setObject(serial + '.system.reboot', {
+             type: 'state',
+             common: {
+                 name: 'Reboot ',
+                 type: 'boolean',
+                 role: 'button',
+                 read: false,
+                 write: true
+             },
+             native: {}
+         });
+
+
+         this.setObject(serial + '.logs.getlogs', {
+             type: 'state',
+             common: {
+                 name: 'Get Logs from camera',
+                 type: 'boolean',
+                 role: 'button',
+                 read: false,
+                 write: true
+             },
+             native: {}
+         });
+
+         this.setObject(serial + '.logs.systemlog', {
+             type: 'state',
+             common: {
+                 name: 'System Log ',
+                 type: 'string',
+                 role: 'text',
+                 read: true,
+                 write: false
+             },
+             native: {}
+         });
+
+         this.setObject(serial + '.logs.accesslog', {
+             type: 'state',
+             common: {
+                 name: 'Access Log ',
+                 type: 'string',
+                 role: 'text',
+                 read: true,
+                 write: false
+             },
+             native: {}
+         });
+    }
 
 
     beautifyMsg(message){

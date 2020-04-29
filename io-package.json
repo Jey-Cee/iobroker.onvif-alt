@@ -1,8 +1,20 @@
 {
     "common": {
-        "name": "onvif",
-        "version": "0.1.2",
+        "name": "onvif-alt",
+        "version": "0.2.0",
         "news": {
+            "0.2.0": {
+                "en": "rename adapter",
+                "de": "Adapter umbenennen",
+                "ru": "переименовать адаптер",
+                "pt": "renomear adaptador",
+                "nl": "hernoem adapter",
+                "fr": "renommer l'adaptateur",
+                "it": "rinominare adattatore",
+                "es": "cambiar el nombre del adaptador",
+                "pl": "zmień nazwę adaptera",
+                "zh-cn": "重命名适配器"
+            },
             "0.1.0": {
                 "en": "initial version created with Adapter-Studio by Jey Cee",
                 "de": "erste Version erstellt mit Adapter-Studio von Jey Cee",
@@ -15,18 +27,18 @@
                 "pl": "początkowa wersja stworzona za pomocą Adapter-Studio przez Jey Cee"
             }
         },
-        "title": "Onvif",
+        "title": "Onvif alternative",
         "titleLang": {
-            "en": "Onvif",
-            "de": "Onvif",
-            "ru": "Onvif",
-            "pt": "Onvif",
-            "nl": "Onvif",
-            "fr": "Onvif",
-            "it": "Onvif",
-            "es": "Onvif",
-            "pl": "Onvif",
-            "zh-cn": "Onvif"
+            "en": "Onvif alternative",
+            "de": "Onvif alternative",
+            "ru": "Onvif alternative",
+            "pt": "Onvif alternative",
+            "nl": "Onvif alternative",
+            "fr": "Onvif alternative",
+            "it": "Onvif alternative",
+            "es": "Onvif alternative",
+            "pl": "Onvif alternative",
+            "zh-cn": "Onvif alternative"
         },
         "desc": {
             "en": "Discover and control onvif ready cameras.\n",
@@ -54,8 +66,8 @@
         "main": "main.js",
         "icon": "onvif.png",
         "enabled": false,
-        "extIcon": "https://raw.githubusercontent.com/Jey-Cee/ioBroker.onvif/master/admin/onvif.png",
-        "readme": "https://github.com/Jey-Cee/ioBroker.onvif/blob/master/README.md",
+        "extIcon": "https://raw.githubusercontent.com/Jey-Cee/ioBroker.onvif-alt/master/admin/onvif.png",
+        "readme": "https://github.com/Jey-Cee/ioBroker.onvif-alt/blob/master/README.md",
         "loglevel": "info",
         "mode": "daemon",
         "type": "hardware",
@@ -70,7 +82,6 @@
         "messagebox": true
     },
     "native": {
-        "ffmpeg_installed": false
     },
     "objects": [],
     "instanceObjects": [
