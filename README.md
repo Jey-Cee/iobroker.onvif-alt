@@ -10,6 +10,10 @@
 
 **Tests:**: [![Travis-CI](http://img.shields.io/travis/jey-cee/ioBroker.onvif-alt/master.svg)](https://travis-ci.org/jey-cee/ioBroker.onvif-alt)
 
+# Development stopped
+From now on this adapter does not become any new features, features that aren't completed yet will not be finalized.
+But i will provide fixes to keep it compatible with future versions of ioBroker.
+
 ## Onvif - IP camera protocol
 
 The aim of this adapter is to find and control cameras that supports the Onvif protocol
