@@ -58,9 +58,9 @@
         }
 
         function emitDevices(){
-            socket.emit('getObjectView', 'system', 'device', { startkey: 'onvif.' + instance + '.', endkey: 'onvif.' + instance + '.\u9999', include_docs: true }, function (err, _devices) {
+            socket.emit('getObjectView', 'system', 'device', { startkey: 'onvif-alt.' + instance + '.', endkey: 'onvif-alt.' + instance + '.\u9999', include_docs: true }, function (err, _devices) {
                 socket.emit('getStates', function (err, _values) {
-                    let namespace = 'onvif.' + instance + '.';
+                    let namespace = 'onvif-alt.' + instance + '.';
                     let len = namespace.length;
                     if (_devices && _devices.rows && _devices.rows.length) {
                         for (let j = 0; j < _devices.rows.length; j++) {
