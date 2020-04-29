@@ -1789,8 +1789,8 @@ if (module.parent) {
     /**
      * @param {Partial<ioBroker.AdapterOptions>} [options={}]
      */
-    module.exports = (options) => new Onvif(options);
+    module.exports = (options) => new Onvif_alt(options);
 } else {
     // otherwise start the instance directly
-    new Onvif();
+    new Onvif_alt();
 }
