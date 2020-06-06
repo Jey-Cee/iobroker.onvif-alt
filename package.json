@@ -19,8 +19,8 @@
         "url": "https://github.com/Jey-Cee/ioBroker.onvif-alt.git"
     },
     "dependencies": {
-        "onvif-nvt": "^0.2.24",
-        "unzipper": "^0.10.11"
+        "@iobroker/adapter-core": "^2.4.0",
+        "onvif-nvt": "^0.2.24"
     },
     "devDependencies": {
         "@iobroker/testing": "^1.2.5",

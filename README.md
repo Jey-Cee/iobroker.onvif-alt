@@ -1,4 +1,4 @@
-![Logo](admin/onvif.png)
+![Logo](admin/onvif-alt.png)
 # ioBroker.onvif-alt
 
 [![NPM version](http://img.shields.io/npm/v/iobroker.onvif-alt.svg)](https://www.npmjs.com/package/iobroker.onvif-alt)

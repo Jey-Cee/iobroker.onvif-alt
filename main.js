@@ -8,11 +8,6 @@
 // you need to create an adapter
 const utils = require('@iobroker/adapter-core');
 const OnvifManager = require('onvif-nvt');
-const unzipper = require('unzipper');
-const OS = require('os');
-const https = require('https');
-const fs = require('fs');
-const exec = require('child_process').exec;
 
 
 class Onvif_alt extends utils.Adapter {
@@ -549,7 +544,7 @@ class Onvif_alt extends utils.Adapter {
             .then(async results =>{
                 results.events.getServiceCapabilities()
                     .then(results => {
-                        console.log(results.data);
+                        this.log.info(results.data);
                     }, reject => {
                         this.log.error(address + ' get Event Properties:' + JSON.stringify(reject));
                     });
@@ -1256,6 +1251,8 @@ class Onvif_alt extends utils.Adapter {
                         let c = this.createStatesByServices(camera);
                         let d = this.updateMainInfo(camera);
 
+                        this.receiveEvents(ip, port, path);
+
                         }, reject => {
                             //this.log.error('Connect to cams:' + JSON.stringify(reject));
                             this.log.error('Connect to cams:' + ip + ' ' + JSON.stringify(reject));
@@ -1273,7 +1270,7 @@ class Onvif_alt extends utils.Adapter {
                         let c = this.createStatesByServices(camera);
                         let d = this.updateMainInfo(camera);
 
-                        //new this.receiveEvents(ip, port, path);
+                        this.receiveEvents(ip, port, path);
 
                     }, reject => {
                         //this.log.error('Connect to cams:' + JSON.stringify(reject));
@@ -1290,16 +1287,16 @@ class Onvif_alt extends utils.Adapter {
                 let camera = results;
 
                 camera.events.on('messages', messages => {
-                    console.log('Messages Received:', messages)
+                    this.log.info('Messages Received:', messages)
                 });
 
                 camera.events.on('messages:error', error => {
                     console.error('Messages Error:', error)
+                    camera.events.stopPull();
                 });
 
                 camera.events.startPull()
             }, reject => {
-                //this.log.error('Connect to cams:' + JSON.stringify(reject));
                 this.log.error('Connect to cam:' + ip + ' ' + JSON.stringify(reject));
             })
     }
