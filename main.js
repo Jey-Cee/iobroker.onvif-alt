@@ -416,7 +416,7 @@ class Onvif_alt extends utils.Adapter {
                                         this.setState(cam + '.network.' + token + '.ipv6_enabled', {val: ipv6_enabled, ack: true});
                                     }
 
-                                    if(ifaces[i]['IPv6']['Config']['DHCP'] !== undefined){
+                                    if(ifaces[i]['IPv6']['Config'] !== undefined && ifaces[i]['IPv6']['Config']['DHCP'] !== undefined){
                                         ipv6_dhcp = ifaces[i]['IPv6']['Config']['DHCP'];
                                         this.setObjectNotExists(cam + '.network.' + token + '.ipv6_dhcp', {
                                             type: 'state',
